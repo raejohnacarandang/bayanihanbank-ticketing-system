@@ -32,7 +32,7 @@ export const NotificationToasts: React.FC<NotificationToastsProps> = ({
         >
           <div
             className={`flex items-start gap-1.5 px-3 py-2 text-white text-[11px] font-bold ${
-              notification.type === 'success' ? 'bg-emerald-700' : 'bg-blue-800'
+              notification.type === 'success' ? 'bg-emerald-700' : 'bg-slate-800'
             }`}
           >
             {notification.type === 'success' ? (
@@ -54,7 +54,7 @@ export const NotificationToasts: React.FC<NotificationToastsProps> = ({
             className="w-full text-left p-3 hover:bg-slate-50 transition cursor-pointer"
           >
             <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-              <TicketIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+              <TicketIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
               <span className="truncate">{notification.title}</span>
             </div>
             <p className="text-xs text-slate-600 mt-1 line-clamp-2">{notification.message}</p>

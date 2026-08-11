@@ -1,30 +1,155 @@
 import React, { useState } from 'react';
-import { User } from '../types';
 import { BayanihanLogo } from '../components/BayanihanLogo';
-import { ShieldCheck, Lock, User as UserIcon, AlertCircle, ArrowRight, CheckCircle2, Building, Key, Eye, EyeOff } from 'lucide-react';
+import { ShieldCheck, Lock, User as UserIcon, AlertCircle, ArrowRight, Eye, EyeOff, X, KeyRound } from 'lucide-react';
 
 interface LoginViewProps {
-  allUsers: User[];
   onLogin: (username: string, password: string) => Promise<void>;
+  onRequestPasswordReset?: (username: string) => Promise<{ requiresRecoveryKey?: boolean }>;
+  onAdminRecovery?: (username: string, key: string) => Promise<{ oneTimePassword: string }>;
 }
 
-export const LoginView: React.FC<LoginViewProps> = ({ allUsers, onLogin }) => {
-  const [username, setUsername] = useState('branch.user');
-  const [password, setPassword] = useState('password123');
+interface SavedAccount {
+  username: string;
+  password: string;
+}
+
+const SAVED_ACCOUNTS_KEY = 'bb_saved_creds';
+const MAX_SAVED_ACCOUNTS = 5;
+
+const readSavedAccounts = (): SavedAccount[] => {
+  try {
+    const raw = localStorage.getItem(SAVED_ACCOUNTS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as SavedAccount | SavedAccount[];
+    const list = Array.isArray(parsed) ? parsed : [parsed];
+    return list.filter(
+      (a) => a && typeof a.username === 'string' && a.username.length > 0
+    );
+  } catch {
+    return [];
+  }
+};
+
+const writeSavedAccounts = (accounts: SavedAccount[]): void => {
+  localStorage.setItem(SAVED_ACCOUNTS_KEY, JSON.stringify(accounts));
+};
+
+export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRequestPasswordReset, onAdminRecovery }) => {
+  const [savedAccounts, setSavedAccounts] = useState<SavedAccount[]>(() => readSavedAccounts());
+  const [username, setUsername] = useState(savedAccounts[0]?.username ?? '');
+  const [password, setPassword] = useState(savedAccounts[0]?.password ?? '');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
   const [showForgotModal, setShowForgotModal] = useState(false);
+  const [resetUsername, setResetUsername] = useState('');
+  const [resetStatus, setResetStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+  const [resetMessage, setResetMessage] = useState('');
+  const [recoveryKey, setRecoveryKey] = useState('');
+  const [oneTimePassword, setOneTimePassword] = useState('');
+  const [recoveryMode, setRecoveryMode] = useState(false);
+
+  const submitResetRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetUsername.trim() || resetStatus === 'submitting') return;
+    setResetStatus('submitting');
+    setResetMessage('');
+    try {
+      if (!onRequestPasswordReset) throw new Error('unavailable');
+      const res = await onRequestPasswordReset(resetUsername.trim());
+      if (res?.requiresRecoveryKey) {
+        setRecoveryMode(true);
+        setResetStatus('idle');
+        setResetMessage(
+          'This is an administrator account. Enter the recovery key issued to the IT operations team.'
+        );
+        return;
+      }
+      setResetStatus('success');
+      setResetMessage('Reset request submitted. Your IT administrator will set a new password for you.');
+    } catch {
+      setResetStatus('error');
+      setResetMessage(
+        'No account found with that username. Please check and try again, or contact the IT Helpdesk.'
+      );
+    }
+  };
+
+  const submitRecovery = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!recoveryKey.trim() || resetStatus === 'submitting') return;
+    setResetStatus('submitting');
+    setResetMessage('');
+    try {
+      if (!onAdminRecovery) throw new Error('unavailable');
+      const res = await onAdminRecovery(resetUsername.trim(), recoveryKey.trim());
+      setOneTimePassword(res.oneTimePassword);
+      setResetStatus('success');
+      setResetMessage(
+        'Password reset. Sign in with the one-time password below — you will be required to set a new password on first login.'
+      );
+    } catch {
+      setResetStatus('error');
+      setResetMessage(
+        'Recovery failed. Check the recovery key or contact the IT operations team.'
+      );
+    }
+  };
+
+  const closeForgotModal = () => {
+    setShowForgotModal(false);
+    setResetStatus('idle');
+    setResetMessage('');
+    setResetUsername('');
+    setRecoveryKey('');
+    setOneTimePassword('');
+    setRecoveryMode(false);
+  };
+
+  const saveAccount = (user: string, pass: string) => {
+    setSavedAccounts((prev) => {
+      const next = [
+        { username: user, password: pass },
+        ...prev.filter((a) => a.username.toLowerCase() !== user.toLowerCase()),
+      ].slice(0, MAX_SAVED_ACCOUNTS);
+      writeSavedAccounts(next);
+      return next;
+    });
+  };
 
   const performLogin = async (user: string, pass: string) => {
     setErrorMessage('');
     try {
       await onLogin(user, pass);
+      if (rememberMe) saveAccount(user, pass);
     } catch {
-      setErrorMessage(
-        'Invalid username or password. Please use one of the demo accounts listed below.'
-      );
+      setErrorMessage('Invalid username or password.');
     }
+  };
+
+  const handleSelectAccount = (account: SavedAccount) => {
+    setUsername(account.username);
+    setPassword(account.password);
+    void performLogin(account.username, account.password);
+  };
+
+  const handleRemoveAccount = (acctUsername: string) => {
+    setSavedAccounts((prev) => {
+      const next = prev.filter((a) => a.username.toLowerCase() !== acctUsername.toLowerCase());
+      writeSavedAccounts(next);
+      return next;
+    });
+    if (username.toLowerCase() === acctUsername.toLowerCase()) {
+      setUsername('');
+      setPassword('');
+    }
+  };
+
+  const handleClearAllSaved = () => {
+    localStorage.removeItem(SAVED_ACCOUNTS_KEY);
+    setSavedAccounts([]);
+    setUsername('');
+    setPassword('');
   };
 
   const handleLoginSubmit = (e: React.FormEvent) => {
@@ -32,27 +157,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ allUsers, onLogin }) => {
     void performLogin(username, password);
   };
 
-  const handleSelectQuickAccount = (user: User) => {
-    setUsername(user.username);
-    setPassword('password123');
-    void performLogin(user.username, 'password123');
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-950 via-slate-950 to-emerald-950 text-slate-100 flex flex-col justify-between p-4 sm:p-6 lg:p-8">
-      {/* Top Corporate Disclaimer Bar */}
-      <div className="max-w-md sm:max-w-2xl mx-auto w-full bg-emerald-900/60 border border-emerald-700/60 text-emerald-200 px-4 py-2.5 rounded-xl text-xs flex items-center justify-between gap-3 shadow-md">
-        <div className="flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
-          <span>
-            <strong>PROTOTYPE DEMONSTRATION MODE:</strong> Fictional Bayanihan Bank IT Service Desk UI.
-          </span>
-        </div>
-        <span className="text-[10px] font-mono bg-emerald-950 px-2 py-0.5 rounded text-amber-300 font-bold border border-emerald-800">
-          AUG 2026
-        </span>
-      </div>
-
       {/* Main Login Card Container */}
       <div className="my-auto max-w-md mx-auto w-full space-y-6 pt-6 pb-8">
         {/* Bank Brand Identity Header */}
@@ -66,7 +172,59 @@ export const LoginView: React.FC<LoginViewProps> = ({ allUsers, onLogin }) => {
         </div>
 
         {/* Login Form Card */}
-        <div className="bg-white text-slate-900 rounded-2xl shadow-2xl p-6 sm:p-8 border border-slate-200">
+        <div className="bg-white text-slate-900 rounded-2xl shadow-[var(--shadow-pop)] p-6 sm:p-8 border border-slate-200 animate-fade-up">
+          {savedAccounts.length > 0 && (
+            <div className="mb-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">
+                  Saved Accounts
+                </span>
+                <button
+                  type="button"
+                  onClick={handleClearAllSaved}
+                  className="text-[10px] font-bold text-slate-400 hover:text-red-600 underline cursor-pointer"
+                >
+                  Clear all
+                </button>
+              </div>
+              <div className="space-y-1.5">
+                {savedAccounts.map((account) => (
+                  <div
+                    key={account.username}
+                    className="flex items-center gap-1.5 p-1.5 rounded-lg border border-emerald-200 bg-emerald-50/60"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => handleSelectAccount(account)}
+                      className="flex-1 flex items-center gap-2.5 text-left cursor-pointer"
+                    >
+                      <div className="w-8 h-8 rounded-full bg-emerald-700 text-white flex items-center justify-center shrink-0">
+                        <UserIcon className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-xs font-bold text-slate-800 truncate">
+                          {account.username}
+                        </div>
+                        <div className="text-[10px] text-emerald-600">
+                          Click to sign in as this account
+                        </div>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveAccount(account.username)}
+                      className="p-1.5 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition cursor-pointer shrink-0"
+                      title={`Remove ${account.username}`}
+                      aria-label={`Remove ${account.username}`}
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <form onSubmit={handleLoginSubmit} className="space-y-4">
             {errorMessage && (
               <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs flex items-start gap-2">
@@ -140,102 +298,144 @@ export const LoginView: React.FC<LoginViewProps> = ({ allUsers, onLogin }) => {
 
             <button
               type="submit"
-              className="w-full py-3 bg-emerald-900 hover:bg-emerald-800 text-amber-300 font-extrabold text-sm rounded-xl transition shadow-md flex items-center justify-center gap-2 cursor-pointer border border-emerald-700"
+              className="w-full py-3 bg-gradient-to-r from-emerald-950 to-emerald-800 hover:from-emerald-900 hover:to-emerald-700 text-amber-300 font-extrabold text-sm rounded-xl transition shadow-lg hover:shadow-xl active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer border border-emerald-700"
             >
               <span>Access IT Portal</span>
               <ArrowRight className="w-4 h-4 text-amber-400" />
             </button>
           </form>
-
-          {/* Quick Demo Credentials Assistant */}
-          <div className="mt-6 pt-5 border-t border-slate-200">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                <Key className="w-3.5 h-3.5 text-amber-600" />
-                Select Demo Account:
-              </span>
-              <span className="text-[10px] text-slate-500 font-mono">Password: password123</span>
-            </div>
-
-            <div className="space-y-2">
-              {allUsers.map((u) => (
-                <button
-                  key={u.id}
-                  onClick={() => handleSelectQuickAccount(u)}
-                  className="w-full text-left p-2.5 rounded-lg border border-slate-200 hover:border-emerald-400 hover:bg-emerald-50/50 transition flex items-center justify-between group cursor-pointer"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <div
-                      className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs ${
-                        u.role === 'BRANCH_USER'
-                          ? 'bg-emerald-100 text-emerald-900'
-                          : u.role === 'IT_STAFF'
-                          ? 'bg-amber-100 text-amber-900'
-                          : u.role === 'AUDITOR'
-                          ? 'bg-teal-100 text-teal-900'
-                          : 'bg-purple-100 text-purple-900'
-                      }`}
-                    >
-                      {u.name.charAt(0)}
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold text-slate-800 group-hover:text-emerald-950">
-                        {u.name}
-                      </div>
-                      <div className="text-[10px] text-slate-500">
-                        {u.username} ({u.branchName || u.department})
-                      </div>
-                    </div>
-                  </div>
-
-                  <span
-                    className={`text-[10px] font-semibold px-2 py-0.5 rounded ${
-                      u.role === 'BRANCH_USER'
-                        ? 'bg-emerald-100 text-emerald-800'
-                        : u.role === 'IT_STAFF'
-                        ? 'bg-amber-100 text-amber-900'
-                        : u.role === 'AUDITOR'
-                        ? 'bg-teal-100 text-teal-900'
-                        : 'bg-purple-100 text-purple-900'
-                    }`}
-                  >
-                    {u.role === 'BRANCH_USER' ? 'Branch' : u.role === 'IT_STAFF' ? 'Main IT' : u.role === 'AUDITOR' ? 'Auditor' : 'Admin'}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
       </div>
 
-      {/* Forgot Password Modal (Prototype Element) */}
+      {/* Forgot Password Modal */}
       {showForgotModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white text-slate-900 rounded-xl max-w-sm w-full p-6 space-y-4 shadow-2xl border border-slate-200">
-            <div className="flex items-center gap-2 text-emerald-900 font-bold text-base">
-              <ShieldCheck className="w-5 h-5 text-emerald-600" />
-              <span>Password Reset (Prototype)</span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-emerald-900 font-bold text-base">
+                <ShieldCheck className="w-5 h-5 text-emerald-600" />
+                <span>Reset Password</span>
+              </div>
+              <button
+                onClick={closeForgotModal}
+                className="p-1 rounded hover:bg-slate-100 text-slate-500 cursor-pointer"
+                aria-label="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              In the eventual production system, password resets will be routed through Bayanihan Bank&apos;s Active Directory / Main IT Helpdesk authorization workflow.
-            </p>
-            <div className="p-3 bg-slate-100 rounded-lg text-xs font-mono text-slate-700">
-              Demo Credentials:<br />
-              Password for all accounts: <strong>password123</strong>
-            </div>
-            <button
-              onClick={() => setShowForgotModal(false)}
-              className="w-full py-2 bg-emerald-950 text-white font-semibold text-xs rounded-lg hover:bg-emerald-900 transition"
-            >
-              Close Notice
-            </button>
+
+            {resetStatus === 'success' ? (
+              <div className="space-y-3">
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  <strong className="text-emerald-700">Request received.</strong>{' '}
+                  {resetMessage}
+                </p>
+                {oneTimePassword && (
+                  <div className="p-4 rounded-lg bg-emerald-50 border border-emerald-300 text-center space-y-2">
+                    <p className="text-[10px] uppercase tracking-wider font-bold text-emerald-700">
+                      One-time password
+                    </p>
+                    <p className="font-mono text-lg font-black text-emerald-900 break-all">
+                      {oneTimePassword}
+                    </p>
+                    <p className="text-[10px] text-emerald-700 leading-relaxed">
+                      Copy it now — it is shown only once. You will be forced to set a new password on first login.
+                    </p>
+                  </div>
+                )}
+                <button
+                  onClick={closeForgotModal}
+                  className="w-full py-2 bg-emerald-950 text-white font-semibold text-xs rounded-lg hover:bg-emerald-900 transition cursor-pointer"
+                >
+                  Done
+                </button>
+              </div>
+            ) : recoveryMode ? (
+              <form onSubmit={submitRecovery} className="space-y-3">
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs">
+                  <KeyRound className="w-4 h-4 shrink-0" />
+                  <span>
+                    Account <strong>{resetUsername}</strong> is an administrator. Enter the recovery key.
+                  </span>
+                </div>
+                <div className="relative">
+                  <KeyRound className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="password"
+                    value={recoveryKey}
+                    onChange={(e) => setRecoveryKey(e.target.value)}
+                    placeholder="Recovery key"
+                    autoFocus
+                    className="w-full pl-9 pr-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                  />
+                </div>
+                {resetStatus === 'error' && (
+                  <div className="flex items-start gap-2 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs">
+                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                    <span>{resetMessage}</span>
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRecoveryMode(false);
+                      setResetStatus('idle');
+                      setResetMessage('');
+                    }}
+                    className="px-3 py-2 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={!recoveryKey.trim() || resetStatus === 'submitting'}
+                    className="flex-1 py-2 bg-emerald-950 text-white font-semibold text-xs rounded-lg hover:bg-emerald-900 transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                  >
+                    {resetStatus === 'submitting' ? 'Resetting…' : 'Reset Password'}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <form onSubmit={submitResetRequest} className="space-y-3">
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Enter the username for your Bayanihan Bank account. Your IT
+                  administrator will be notified and will issue you a new password.
+                </p>
+                <div className="relative">
+                  <UserIcon className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={resetUsername}
+                    onChange={(e) => setResetUsername(e.target.value)}
+                    placeholder="Your username"
+                    autoFocus
+                    className="w-full pl-9 pr-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                  />
+                </div>
+                {resetStatus === 'error' && (
+                  <div className="flex items-start gap-2 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs">
+                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                    <span>{resetMessage}</span>
+                  </div>
+                )}
+                <button
+                  type="submit"
+                  disabled={!resetUsername.trim() || resetStatus === 'submitting'}
+                  className="w-full py-2 bg-emerald-950 text-white font-semibold text-xs rounded-lg hover:bg-emerald-900 transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  {resetStatus === 'submitting' ? 'Submitting…' : 'Submit Reset Request'}
+                </button>
+              </form>
+            )}
           </div>
         </div>
       )}
 
       {/* Footer Disclaimer */}
       <footer className="text-center text-emerald-300/70 text-[11px] py-4 border-t border-emerald-900/80">
-        Bayanihan Bank IT Service Desk Prototype — Internal Trainee Project (August 7, 2026)
+        Bayanihan Bank IT Service Desk (August 7, 2026)
       </footer>
     </div>
   );

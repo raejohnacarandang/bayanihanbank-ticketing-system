@@ -18,7 +18,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <Bell className="w-6 h-6 text-blue-600" />
+            <Bell className="w-6 h-6 text-emerald-600" />
             <span>Notification Center</span>
           </h1>
           <p className="text-xs text-slate-500 mt-1">
@@ -44,8 +44,8 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                 onMarkRead(n.id);
                 onNavigateTicket(n.ticketId);
               }}
-              className={`p-4 sm:p-5 hover:bg-blue-50/40 transition cursor-pointer flex items-start justify-between gap-4 ${
-                !n.read ? 'bg-blue-50/60' : ''
+              className={`p-4 sm:p-5 hover:bg-emerald-50/40 transition cursor-pointer flex items-start justify-between gap-4 ${
+                !n.read ? 'bg-emerald-50/60' : ''
               }`}
             >
               <div className="flex items-start gap-3">
@@ -53,7 +53,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                   className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
                     n.type === 'success'
                       ? 'bg-emerald-100 text-emerald-600'
-                      : 'bg-blue-100 text-blue-600'
+                      : 'bg-sky-100 text-sky-600'
                   }`}
                 >
                   {n.type === 'success' ? <CheckCircle2 className="w-5 h-5" /> : <Bell className="w-5 h-5" />}
@@ -63,7 +63,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                   <div className="flex items-center gap-2">
                     <h4 className="text-sm font-bold text-slate-900">{n.title}</h4>
                     {!n.read && (
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-600 text-white uppercase tracking-wider">
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-600 text-white uppercase tracking-wider">
                         New
                       </span>
                     )}
@@ -75,7 +75,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                 </div>
               </div>
 
-              <button className="text-xs text-blue-700 font-bold hover:underline flex items-center gap-1 shrink-0">
+              <button className="text-xs text-emerald-700 font-bold hover:underline flex items-center gap-1 shrink-0">
                 <span>View Ticket</span>
                 <ExternalLink className="w-3.5 h-3.5" />
               </button>

@@ -75,12 +75,12 @@ const DDL: string[] = [
     avatarUrl VARCHAR(500),
     password_hash VARCHAR(200),
     must_change_password TINYINT(1) DEFAULT 0,
+    password_reset_requested TINYINT(1) DEFAULT 0,
     assignments JSON
   )`,
 
   `CREATE TABLE IF NOT EXISTS branches (
     id VARCHAR(50) PRIMARY KEY,
-    code VARCHAR(20) NOT NULL,
     name VARCHAR(150) NOT NULL,
     location VARCHAR(200),
     status VARCHAR(20) NOT NULL,
@@ -91,8 +91,6 @@ const DDL: string[] = [
     id VARCHAR(50) PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     description TEXT,
-    slaTargetHours VARCHAR(50),
-    slaHours INT DEFAULT 0,
     status VARCHAR(20) NOT NULL
   )`,
 
@@ -101,7 +99,6 @@ const DDL: string[] = [
     subject VARCHAR(300) NOT NULL,
     description TEXT,
     category VARCHAR(100) NOT NULL,
-    priority VARCHAR(20) NOT NULL,
     status VARCHAR(20) NOT NULL,
     requesterId VARCHAR(50),
     requesterName VARCHAR(150),
@@ -199,10 +196,39 @@ export async function initDatabase(): Promise<void> {
   } catch {
     // Column already exists.
   }
+  // Migration: add password_reset_requested column to pre-existing users tables.
+  try {
+    await pool.query('ALTER TABLE users ADD COLUMN password_reset_requested TINYINT(1) DEFAULT 0');
+  } catch {
+    // Column already exists.
+  }
   // Backfill: assign the demo password hash to any legacy account without one.
   await pool.query('UPDATE users SET password_hash = ? WHERE password_hash IS NULL', [
     hashPassword(DEFAULT_PASSWORD),
   ]);
+  // Migration: drop the legacy priority column from pre-existing tickets tables.
+  try {
+    await pool.query('ALTER TABLE tickets DROP COLUMN priority');
+  } catch {
+    // Column already dropped.
+  }
+  // Migration: drop the legacy SLA columns from pre-existing categories tables.
+  try {
+    await pool.query('ALTER TABLE categories DROP COLUMN slaTargetHours');
+  } catch {
+    // Column already dropped.
+  }
+  try {
+    await pool.query('ALTER TABLE categories DROP COLUMN slaHours');
+  } catch {
+    // Column already dropped.
+  }
+  // Migration: drop the branch code column (bank has no branch codes).
+  try {
+    await pool.query('ALTER TABLE branches DROP COLUMN code');
+  } catch {
+    // Column already dropped.
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -258,22 +284,22 @@ export async function seedIfEmpty(): Promise<void> {
         );
       }
       await conn.query(
-        'INSERT INTO users (id, username, name, role, branchId, branchName, department, email, avatarUrl, password_hash, must_change_password, assignments) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [u.id, u.username, u.name, u.role, u.branchId ?? null, u.branchName ?? null, u.department ?? null, u.email ?? null, u.avatarUrl ?? null, hashPassword(password), demoMode ? 0 : 1, u.assignments ? JSON.stringify(u.assignments) : null]
+        'INSERT INTO users (id, username, name, role, branchId, branchName, department, email, avatarUrl, password_hash, must_change_password, password_reset_requested, assignments) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [u.id, u.username, u.name, u.role, u.branchId ?? null, u.branchName ?? null, u.department ?? null, u.email ?? null, u.avatarUrl ?? null, hashPassword(password), demoMode ? 0 : 1, u.passwordResetRequested ? 1 : 0, u.assignments ? JSON.stringify(u.assignments) : null]
       );
     }
 
     for (const b of INITIAL_BRANCHES) {
       await conn.query(
-        'INSERT INTO branches (id, code, name, location, status, userCount) VALUES (?, ?, ?, ?, ?, ?)',
-        [b.id, b.code, b.name, b.location, b.status, b.userCount]
+        'INSERT INTO branches (id, name, location, status, userCount) VALUES (?, ?, ?, ?, ?)',
+        [b.id, b.name, b.location, b.status, b.userCount]
       );
     }
 
     for (const c of INITIAL_CATEGORIES) {
       await conn.query(
-        'INSERT INTO categories (id, name, description, slaTargetHours, slaHours, status) VALUES (?, ?, ?, ?, ?, ?)',
-        [c.id, c.name, c.description, c.slaTargetHours, c.slaHours, c.status]
+        'INSERT INTO categories (id, name, description, status) VALUES (?, ?, ?, ?)',
+        [c.id, c.name, c.description, c.status]
       );
     }
 
@@ -331,16 +357,15 @@ interface Queryable {
 async function insertTicket(conn: Queryable, t: Ticket): Promise<void> {
   await conn.query(
     `INSERT INTO tickets
-      (id, subject, description, category, priority, status, requesterId, requesterName,
+      (id, subject, description, category, status, requesterId, requesterName,
        branchId, branchName, assignedToId, assignedToName, createdAt, createdAtISO,
        updatedAt, resolutionNotes, resolvedAt, closedAt, attachments)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       t.id,
       t.subject,
       t.description,
       t.category,
-      t.priority,
       t.status,
       t.requesterId,
       t.requesterName,
@@ -371,7 +396,7 @@ async function loadRows<T>(table: string): Promise<T[]> {
 export async function loadState(): Promise<AppState> {
   const [users, branches, categories, tickets, comments, timeline, notifications, auditLogs] =
     await Promise.all([
-      loadRows<User & { assignments?: string | null; password_hash?: string | null; must_change_password?: number | boolean }>('users'),
+      loadRows<User & { assignments?: string | null; password_hash?: string | null; must_change_password?: number | boolean; password_reset_requested?: number | boolean }>('users'),
       loadRows<Branch>('branches'),
       loadRows<CategoryInfo>('categories'),
       loadRows<Ticket & { attachments?: string | null }>('tickets'),
@@ -385,7 +410,15 @@ export async function loadState(): Promise<AppState> {
   const ticketCounter = Number(await getMeta('ticketCounter')) || 126;
 
   const parsedUsers: User[] = users.map((u) => ({
-    ...u,
+    id: u.id,
+    username: u.username,
+    name: u.name,
+    role: u.role,
+    branchId: u.branchId ?? undefined,
+    branchName: u.branchName ?? undefined,
+    department: u.department ?? undefined,
+    email: u.email,
+    avatarUrl: u.avatarUrl ?? undefined,
     assignments: u.assignments
       ? (typeof u.assignments === 'string'
           ? (JSON.parse(u.assignments) as BranchAssignment[])
@@ -393,6 +426,7 @@ export async function loadState(): Promise<AppState> {
       : undefined,
     passwordHash: u.password_hash ?? undefined,
     mustChangePassword: toBool(u.must_change_password),
+    passwordResetRequested: toBool(u.password_reset_requested),
   }));
 
   const parsedTickets: Ticket[] = tickets.map((t) => ({
@@ -448,22 +482,22 @@ export async function saveState(state: AppState): Promise<void> {
 
     for (const u of state.users) {
       await conn.query(
-        'INSERT INTO users (id, username, name, role, branchId, branchName, department, email, avatarUrl, must_change_password, assignments) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [u.id, u.username, u.name, u.role, u.branchId ?? null, u.branchName ?? null, u.department ?? null, u.email ?? null, u.avatarUrl ?? null, u.mustChangePassword ? 1 : 0, u.assignments ? JSON.stringify(u.assignments) : null]
+        'INSERT INTO users (id, username, name, role, branchId, branchName, department, email, avatarUrl, must_change_password, password_reset_requested, assignments) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [u.id, u.username, u.name, u.role, u.branchId ?? null, u.branchName ?? null, u.department ?? null, u.email ?? null, u.avatarUrl ?? null, u.mustChangePassword ? 1 : 0, u.passwordResetRequested ? 1 : 0, u.assignments ? JSON.stringify(u.assignments) : null]
       );
     }
 
     for (const b of state.branches) {
       await conn.query(
-        'INSERT INTO branches (id, code, name, location, status, userCount) VALUES (?, ?, ?, ?, ?, ?)',
-        [b.id, b.code, b.name, b.location, b.status, b.userCount]
+        'INSERT INTO branches (id, name, location, status, userCount) VALUES (?, ?, ?, ?, ?)',
+        [b.id, b.name, b.location, b.status, b.userCount]
       );
     }
 
     for (const c of state.categories) {
       await conn.query(
-        'INSERT INTO categories (id, name, description, slaTargetHours, slaHours, status) VALUES (?, ?, ?, ?, ?, ?)',
-        [c.id, c.name, c.description, c.slaTargetHours, c.slaHours, c.status]
+        'INSERT INTO categories (id, name, description, status) VALUES (?, ?, ?, ?)',
+        [c.id, c.name, c.description, c.status]
       );
     }
 
@@ -524,52 +558,52 @@ const rowsEqual = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSO
 
 async function upsertUserRow(conn: Queryable, u: User): Promise<void> {
   await conn.query(
-    `INSERT INTO users (id, username, name, role, branchId, branchName, department, email, avatarUrl, password_hash, must_change_password, assignments)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO users (id, username, name, role, branchId, branchName, department, email, avatarUrl, password_hash, must_change_password, password_reset_requested, assignments)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE
        username = VALUES(username), name = VALUES(name), role = VALUES(role),
        branchId = VALUES(branchId), branchName = VALUES(branchName),
        department = VALUES(department), email = VALUES(email),
        avatarUrl = VALUES(avatarUrl), password_hash = VALUES(password_hash),
        must_change_password = VALUES(must_change_password),
+       password_reset_requested = VALUES(password_reset_requested),
        assignments = VALUES(assignments)`,
-    [u.id, u.username, u.name, u.role, u.branchId ?? null, u.branchName ?? null, u.department ?? null, u.email ?? null, u.avatarUrl ?? null, u.passwordHash ?? null, u.mustChangePassword ? 1 : 0, u.assignments ? JSON.stringify(u.assignments) : null]
+    [u.id, u.username, u.name, u.role, u.branchId ?? null, u.branchName ?? null, u.department ?? null, u.email ?? null, u.avatarUrl ?? null, u.passwordHash ?? null, u.mustChangePassword ? 1 : 0, u.passwordResetRequested ? 1 : 0, u.assignments ? JSON.stringify(u.assignments) : null]
   );
 }
 
 async function upsertBranchRow(conn: Queryable, b: Branch): Promise<void> {
   await conn.query(
-    `INSERT INTO branches (id, code, name, location, status, userCount)
-     VALUES (?, ?, ?, ?, ?, ?)
+    `INSERT INTO branches (id, name, location, status, userCount)
+     VALUES (?, ?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE
-       code = VALUES(code), name = VALUES(name), location = VALUES(location),
+       name = VALUES(name), location = VALUES(location),
        status = VALUES(status), userCount = VALUES(userCount)`,
-    [b.id, b.code, b.name, b.location, b.status, b.userCount]
+    [b.id, b.name, b.location, b.status, b.userCount]
   );
 }
 
 async function upsertCategoryRow(conn: Queryable, c: CategoryInfo): Promise<void> {
   await conn.query(
-    `INSERT INTO categories (id, name, description, slaTargetHours, slaHours, status)
-     VALUES (?, ?, ?, ?, ?, ?)
+    `INSERT INTO categories (id, name, description, status)
+     VALUES (?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE
        name = VALUES(name), description = VALUES(description),
-       slaTargetHours = VALUES(slaTargetHours), slaHours = VALUES(slaHours),
        status = VALUES(status)`,
-    [c.id, c.name, c.description, c.slaTargetHours, c.slaHours, c.status]
+    [c.id, c.name, c.description, c.status]
   );
 }
 
 async function upsertTicketRow(conn: Queryable, t: Ticket): Promise<void> {
   await conn.query(
     `INSERT INTO tickets
-       (id, subject, description, category, priority, status, requesterId, requesterName,
+       (id, subject, description, category, status, requesterId, requesterName,
         branchId, branchName, assignedToId, assignedToName, createdAt, createdAtISO,
         updatedAt, resolutionNotes, resolvedAt, closedAt, attachments)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE
        subject = VALUES(subject), description = VALUES(description),
-       category = VALUES(category), priority = VALUES(priority), status = VALUES(status),
+       category = VALUES(category), status = VALUES(status),
        requesterId = VALUES(requesterId), requesterName = VALUES(requesterName),
        branchId = VALUES(branchId), branchName = VALUES(branchName),
        assignedToId = VALUES(assignedToId), assignedToName = VALUES(assignedToName),
@@ -582,7 +616,6 @@ async function upsertTicketRow(conn: Queryable, t: Ticket): Promise<void> {
       t.subject,
       t.description,
       t.category,
-      t.priority,
       t.status,
       t.requesterId,
       t.requesterName,

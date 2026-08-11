@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: bayanihan-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: bayanihan_bank
+      MYSQL_USER: bayanihan
+      MYSQL_PASSWORD: bayanihan_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bayanihan-network
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: bayanihan-api
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: bayanihan
+      DB_PASSWORD: bayanihan_password
+      DB_NAME: bayanihan_bank
+      JWT_SECRET: your-super-secret-jwt-key-change-in-production
+      ADMIN_RECOVERY_KEY: your-admin-recovery-key
+      DEMO_MODE: "true"
+      NODE_ENV: development
+      PORT: 3001
+    ports:
+      - "3001:3001"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/dist
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - bayanihan-network
+    command: npm run dev:server
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: bayanihan-web
+    environment:
+      VITE_API_URL: http://localhost:3001
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/dist
+    depends_on:
+      - api
+    networks:
+      - bayanihan-network
+    command: npm run dev:web
+
+volumes:
+  mysql_data:
+
+networks:
+  bayanihan-network:
+    driver: bridge

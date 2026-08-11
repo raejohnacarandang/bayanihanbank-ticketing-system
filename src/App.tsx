@@ -5,7 +5,6 @@ import {
   Ticket,
   ActiveView,
   TicketStatus,
-  TicketPriority,
   TicketCategory,
   UserRole,
   Branch,
@@ -15,7 +14,7 @@ import {
 import { AdminTab, pathForView, parsePath } from './routes';
 import { storage } from './services/storageService';
 import { connectRealtime } from './services/realtime';
-import { browserNotification, playChime, primeAudio, requestNotificationPermission } from './services/notify';
+import { browserNotification, cancelPendingAlarms, playChime, primeAudio, requestNotificationPermission } from './services/notify';
 import { NotificationToasts, ToastItem } from './components/NotificationToasts';
 import type {
   CreateBranchParams,
@@ -24,7 +23,6 @@ import type {
 } from './services/store';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
-import { PrototypeBanner } from './components/PrototypeBanner';
 import { RequirementStatusModal } from './components/RequirementStatusModal';
 import { GuidedDemoModal } from './components/GuidedDemoModal';
 import { LoginView } from './views/LoginView';
@@ -38,6 +36,7 @@ import { AdminDashboardView } from './views/AdminDashboardView';
 import { NotificationsView } from './views/NotificationsView';
 import { ProfileView } from './views/ProfileView';
 import { ReportsView } from './views/ReportsView';
+import { WallboardView } from './views/WallboardView';
 
 export default function App() {
   const navigate = useNavigate();
@@ -50,9 +49,13 @@ export default function App() {
   const [notifications, setNotifications] = useState<NotificationItem[]>(() =>
     storage.getNotifications(storage.getCurrentUser().id)
   );
+  const [allNotifications, setAllNotifications] = useState<NotificationItem[]>(() =>
+    storage.getState().notifications
+  );
   const [activeView, setActiveView] = useState<ActiveView>('dashboard');
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [adminTab, setAdminTab] = useState<AdminTab>('overview');
+  const [wallboardStaffId, setWallboardStaffId] = useState<string | undefined>(undefined);
   const [ticketStatusFilter, setTicketStatusFilter] = useState<string>('ALL');
 
   // Modals state
@@ -72,6 +75,14 @@ export default function App() {
   const openFromNotification = useCallback(
     (notificationId: string, ticketId: string) => {
       setToasts((prev) => prev.filter((t) => t.id !== notificationId));
+      // Some notifications (e.g. password-reset requests) reference a user id
+      // instead of a ticket — send the admin to the Users directory.
+      if (!storage.getTicketById(ticketId)) {
+        setAdminTab('users');
+        setActiveView('users');
+        navigate(pathForView('users', 'users'));
+        return;
+      }
       setSelectedTicketId(ticketId);
       setActiveView('ticket_detail');
       navigate(pathForView('ticket_detail', undefined, ticketId));
@@ -86,9 +97,9 @@ export default function App() {
     const fresh = storage.getNotifications(user.id).filter((n) => !seenNotifIds.current.has(n.id));
     if (fresh.length === 0) return;
     for (const n of fresh) seenNotifIds.current.add(n.id);
-    for (const n of fresh) {
+    playChime();
+    for (const n of fresh.slice(0, 5)) {
       setToasts((prev) => [...prev, { id: n.id, notification: n }]);
-      playChime();
       browserNotification(n.title, n.message, () => openFromNotification(n.id, n.ticketId));
       window.setTimeout(() => {
         setToasts((prev) => prev.filter((t) => t.id !== n.id));
@@ -101,6 +112,7 @@ export default function App() {
     setTickets(storage.getTickets());
     setAllUsers(storage.getUsers());
     setNotifications(storage.getNotifications(storage.getCurrentUser().id));
+    setAllNotifications(storage.getState().notifications);
   }, []);
 
   // Restore an existing session on mount
@@ -112,17 +124,21 @@ export default function App() {
         refreshData();
         setCurrentUser(storage.getCurrentUser());
         setIsLoggedIn(true);
+        // Only pre-see notifications that are already read; unread ones will
+        // trigger the alarm + popups below.
         seenNotifIds.current = new Set(
-          storage.getNotifications(storage.getCurrentUser().id).map((n) => n.id)
+          storage.getNotifications(storage.getCurrentUser().id).filter((n) => n.read).map((n) => n.id)
         );
+        detectNewNotifications();
       } else {
         setIsLoggedIn(false);
+        cancelPendingAlarms();
       }
     });
     return () => {
       cancelled = true;
     };
-  }, [refreshData]);
+  }, [refreshData, detectNewNotifications]);
 
   // Keep state in sync with the URL (browser back/forward, deep links)
   useEffect(() => {
@@ -136,10 +152,12 @@ export default function App() {
     setActiveView(parsed.view);
     setAdminTab(parsed.adminTab ?? 'overview');
     if (parsed.ticketId) setSelectedTicketId(parsed.ticketId);
+    if (parsed.staffId) setWallboardStaffId(parsed.staffId);
   }, [location.pathname]);
 
   // Poll for changes made in other tabs / sessions
   useEffect(() => {
+    if (!isLoggedIn) return;
     let active = true;
     const sync = async () => {
       await storage.refresh();
@@ -148,7 +166,7 @@ export default function App() {
         detectNewNotifications();
       }
     };
-    const interval = setInterval(() => void sync(), 30000);
+    const interval = setInterval(() => void sync(), 15000);
     const onFocus = () => void sync();
     const onVisible = () => {
       if (document.visibilityState === 'visible') void sync();
@@ -161,7 +179,7 @@ export default function App() {
       window.removeEventListener('focus', onFocus);
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [refreshData, detectNewNotifications]);
+  }, [isLoggedIn, refreshData, detectNewNotifications]);
 
   // Real-time updates pushed by the server (SSE); polling remains as fallback.
   useEffect(() => {
@@ -184,7 +202,7 @@ export default function App() {
 
   /** Navigate to a view, updating both state and the URL. */
   const go = useCallback(
-    (view: ActiveView, opts?: { adminTab?: AdminTab; ticketId?: string }) => {
+    (view: ActiveView, opts?: { adminTab?: AdminTab; ticketId?: string; staffId?: string }) => {
       if (view === 'requirements') {
         setShowReqModal(true);
         return;
@@ -192,7 +210,8 @@ export default function App() {
       setActiveView(view);
       setAdminTab(opts?.adminTab ?? 'overview');
       if (opts?.ticketId) setSelectedTicketId(opts.ticketId);
-      navigate(pathForView(view, opts?.adminTab, opts?.ticketId));
+      if (opts?.staffId) setWallboardStaffId(opts.staffId);
+      navigate(pathForView(view, opts?.adminTab, opts?.ticketId, opts?.staffId));
     },
     [navigate]
   );
@@ -201,14 +220,27 @@ export default function App() {
     const user = await storage.login(username, password);
     setCurrentUser(user);
     setIsLoggedIn(true);
-    setActiveView('dashboard');
     refreshData();
-    seenNotifIds.current = new Set(storage.getNotifications(user.id).map((n) => n.id));
+    // Only pre-see notifications that are already read; unread ones will
+    // trigger the alarm + popups below.
+    seenNotifIds.current = new Set(
+      storage.getNotifications(user.id).filter((n) => n.read).map((n) => n.id)
+    );
     requestNotificationPermission();
-    navigate('/');
+    detectNewNotifications();
+    // Kiosk/control-room screens: stay on the wallboard they opened on.
+    const parsed = parsePath(location.pathname);
+    if (parsed?.view === 'wallboard') {
+      setActiveView('wallboard');
+      if (parsed.staffId) setWallboardStaffId(parsed.staffId);
+    } else {
+      setActiveView('dashboard');
+      navigate('/');
+    }
   };
 
   const handleLogout = async () => {
+    cancelPendingAlarms();
     await storage.logout();
     setIsLoggedIn(false);
     navigate('/login');
@@ -239,7 +271,11 @@ export default function App() {
       const switched = await storage.impersonate(user);
       setCurrentUser(switched);
       refreshData();
-      seenNotifIds.current = new Set(storage.getNotifications(switched.id).map((n) => n.id));
+      // Unread notifications for the switched account fire the alarm + popups.
+      seenNotifIds.current = new Set(
+        storage.getNotifications(switched.id).filter((n) => n.read).map((n) => n.id)
+      );
+      detectNewNotifications();
       if (activeView !== 'ticket_detail') {
         go('dashboard');
       }
@@ -262,7 +298,6 @@ export default function App() {
     subject: string;
     description: string;
     category: TicketCategory;
-    priority: TicketPriority;
     attachmentName?: string;
   }): Promise<Ticket> => {
     if (isViewOnly) throw new Error('Auditors have read-only access.');
@@ -278,18 +313,6 @@ export default function App() {
   ) => {
     if (isViewOnly) return;
     await storage.updateTicketStatus(ticketId, newStatus, notes);
-    refreshData();
-  };
-
-  const handleAssignStaff = async (ticketId: string, staffUser: User) => {
-    if (isViewOnly) return;
-    await storage.assignTicket(ticketId, staffUser);
-    refreshData();
-  };
-
-  const handleUpdatePriority = async (ticketId: string, newPriority: TicketPriority) => {
-    if (isViewOnly) return;
-    await storage.updateTicketPriority(ticketId, newPriority);
     refreshData();
   };
 
@@ -336,6 +359,15 @@ export default function App() {
   };
 
   const handleNavigateTicketDetail = (ticketId: string) => {
+    // Notifications may reference a user (e.g. password-reset requests) rather
+    // than a ticket — in that case send the admin to the Users directory
+    // instead of a blank ticket page.
+    if (!storage.getTicketById(ticketId)) {
+      setAdminTab('users');
+      setActiveView('users');
+      navigate(pathForView('users', 'users'));
+      return;
+    }
     setSelectedTicketId(ticketId);
     setActiveView('ticket_detail');
     navigate(pathForView('ticket_detail', undefined, ticketId));
@@ -352,17 +384,22 @@ export default function App() {
   const myOpenTicketCount = tickets.filter(
     (t) =>
       (t.branchId === currentUser.branchId || t.requesterId === currentUser.id) &&
-      t.status !== 'Closed' &&
-      t.status !== 'Cancelled'
+      t.status !== 'Closed'
   ).length;
 
-  const newTicketCount = tickets.filter((t) => t.status === 'New').length;
+  const newTicketCount = tickets.filter((t) => !t.assignedToId && t.status !== 'Closed').length;
 
   const allBranches = storage.getBranches();
   const allStaff = allUsers.filter((u) => u.role === 'IT_STAFF' || u.role === 'ADMINISTRATOR');
 
   if (!isLoggedIn) {
-    return <LoginView allUsers={allUsers} onLogin={handleLogin} />;
+    return (
+      <LoginView
+        onLogin={handleLogin}
+        onRequestPasswordReset={(u) => storage.requestPasswordReset(u)}
+        onAdminRecovery={(u, k) => storage.adminRecovery(u, k)}
+      />
+    );
   }
 
   if (currentUser.mustChangePassword) {
@@ -375,21 +412,21 @@ export default function App() {
     );
   }
 
+  // Full-screen per-staff monitor wallboard (opened on a dedicated display).
+  if (activeView === 'wallboard') {
+    return (
+      <WallboardView
+        staff={wallboardStaffId ? allUsers.find((u) => u.id === wallboardStaffId) ?? null : null}
+        tickets={tickets}
+        notifications={allNotifications}
+      />
+    );
+  }
+
   const selectedTicket = selectedTicketId ? storage.getTicketById(selectedTicketId) : null;
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 font-sans flex flex-col antialiased">
-      {/* Top Prototype Disclaimer Banner */}
-      <PrototypeBanner
-        onOpenRequirements={() => setShowReqModal(true)}
-        onOpenDemoGuide={() => setShowDemoGuideModal(true)}
-        onResetData={async () => {
-          await storage.resetToDefaults();
-          setCurrentUser(storage.getCurrentUser());
-          refreshData();
-        }}
-      />
-
       {/* Main Top Header */}
       <Header
         currentUser={currentUser}
@@ -418,6 +455,7 @@ export default function App() {
         {/* Role-Specific Navigation Sidebar */}
         <Sidebar
           currentUser={currentUser}
+          activeView={activeView}
           newTicketCount={newTicketCount}
           myOpenTicketCount={myOpenTicketCount}
           onNavigate={(view) => {
@@ -440,7 +478,10 @@ export default function App() {
         />
 
         {/* Main Content Viewport */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 min-w-0 overflow-hidden">
+        <main
+          key={activeView}
+          className="flex-1 p-4 sm:p-6 lg:p-8 min-w-0 overflow-hidden animate-fade-in"
+        >
           {/* DASHBOARD VIEW */}
           {activeView === 'dashboard' && (
             <>
@@ -467,6 +508,7 @@ export default function App() {
                   categories={storage.getCategories()}
                   auditLogs={storage.getAuditLogs()}
                   tickets={tickets}
+                  notifications={allNotifications}
                   activeTab={adminTab}
                   onSelectTab={onAdminTabSelect}
                   onCreateUser={handleCreateUser}
@@ -490,6 +532,7 @@ export default function App() {
                   categories={storage.getCategories()}
                   auditLogs={storage.getAuditLogs()}
                   tickets={tickets}
+                  notifications={allNotifications}
                   activeTab={adminTab}
                   onSelectTab={onAdminTabSelect}
                   onViewStatusTickets={(status) => {
@@ -559,7 +602,7 @@ export default function App() {
               allBranches={allBranches}
               allStaff={allStaff}
               title="In Progress Tickets Queue"
-              subtitle="IT tickets actively being worked on by Main IT Staff"
+              subtitle="IT tickets actively being worked on by Main IT Specialist"
               onNavigateTicketDetail={handleNavigateTicketDetail}
             />
           )}
@@ -583,11 +626,8 @@ export default function App() {
               comments={storage.getComments(selectedTicket.id)}
               timeline={storage.getTimeline(selectedTicket.id)}
               currentUser={currentUser}
-              allStaff={allStaff}
               onNavigateBack={() => go('dashboard')}
               onUpdateStatus={handleUpdateTicketStatus}
-              onAssignStaff={handleAssignStaff}
-              onUpdatePriority={handleUpdatePriority}
               onAddComment={handleAddComment}
             />
           )}
@@ -601,6 +641,7 @@ export default function App() {
               categories={storage.getCategories()}
               auditLogs={storage.getAuditLogs()}
               tickets={tickets}
+              notifications={allNotifications}
               activeTab={adminTab}
               onSelectTab={onAdminTabSelect}
               onCreateUser={handleCreateUser}
@@ -640,10 +681,10 @@ export default function App() {
       {/* Footer */}
       <footer className="bg-slate-900 text-slate-400 border-t border-slate-800 text-xs py-4 px-6 text-center space-y-1">
         <div>
-          <strong>Bayanihan Bank IT Service Desk</strong> Prototype Concept (August 7, 2026)
+          <strong>Bayanihan Bank IT Service Desk</strong> (August 7, 2026)
         </div>
         <div className="text-[11px] text-slate-500">
-          Internal Trainee Project • Prototype UI for Supervisor Review • Fictional Demo Data Only
+          Fictional Demo Data Only
         </div>
       </footer>
 
@@ -666,12 +707,14 @@ export default function App() {
         }}
       />
 
-      {/* Real-time notification popups */}
-      <NotificationToasts
-        toasts={toasts}
-        onDismiss={(id) => setToasts((prev) => prev.filter((t) => t.id !== id))}
-        onOpen={(notification) => openFromNotification(notification.id, notification.ticketId)}
-      />
+      {/* Real-time notification popups (never on the login page) */}
+      {isLoggedIn && (
+        <NotificationToasts
+          toasts={toasts}
+          onDismiss={(id) => setToasts((prev) => prev.filter((t) => t.id !== id))}
+          onOpen={(notification) => openFromNotification(notification.id, notification.ticketId)}
+        />
+      )}
     </div>
   );
 }

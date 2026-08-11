@@ -11,7 +11,6 @@ import {
   NotificationItem,
   Ticket,
   TicketCategory,
-  TicketPriority,
   TicketStatus,
   TimelineEvent,
   User,
@@ -109,75 +108,6 @@ function withNotification(
 }
 
 // ---------------------------------------------------------------------------
-// SLA tracking
-// ---------------------------------------------------------------------------
-
-const SLA_HOURS: Record<TicketCategory, number> = {
-  Hardware: 24,
-  Software: 12,
-  Network: 4,
-  'Account & Access': 8,
-  'Installation / Configuration': 48,
-  'IT Equipment': 72,
-  'Other IT Concern': 48,
-};
-
-export function slaHoursFor(category: TicketCategory): number {
-  return SLA_HOURS[category] ?? 24;
-}
-
-export function slaDeadlineFor(ticket: Ticket): Date | null {
-  if (!ticket.createdAtISO) return null;
-  const start = new Date(ticket.createdAtISO);
-  if (Number.isNaN(start.getTime())) return null;
-  return new Date(start.getTime() + slaHoursFor(ticket.category) * 60 * 60 * 1000);
-}
-
-export type SlaStatus = 'ok' | 'critical' | 'breached' | 'na';
-
-export function slaStatusFor(ticket: Ticket, now: Date = new Date()): SlaStatus {
-  if (ticket.status === 'Closed' || ticket.status === 'Cancelled') return 'na';
-  const deadline = slaDeadlineFor(ticket);
-  if (!deadline) return 'na';
-  const remaining = deadline.getTime() - now.getTime();
-  if (remaining < 0) return 'breached';
-  if (remaining < slaHoursFor(ticket.category) * 0.25 * 60 * 60 * 1000) return 'critical';
-  return 'ok';
-}
-
-export interface SlaInfo {
-  status: SlaStatus;
-  slaHours: number;
-  deadlineIso: string | null;
-  remainingMs: number | null;
-  label: string;
-}
-
-export function slaInfoFor(ticket: Ticket, now: Date = new Date()): SlaInfo {
-  const slaHours = slaHoursFor(ticket.category);
-  const deadline = slaDeadlineFor(ticket);
-  const status = slaStatusFor(ticket, now);
-  let label = 'N/A';
-  if (deadline && status !== 'na') {
-    const remaining = deadline.getTime() - now.getTime();
-    if (remaining <= 0) {
-      label = 'SLA Breached';
-    } else if (remaining < slaHours * 0.25 * 60 * 60 * 1000) {
-      label = `Due in ${Math.max(1, Math.ceil(remaining / (60 * 60 * 1000)))}h`;
-    } else {
-      label = `Due in ${Math.ceil(remaining / (60 * 60 * 1000))}h`;
-    }
-  }
-  return {
-    status,
-    slaHours,
-    deadlineIso: deadline ? deadline.toISOString() : null,
-    remainingMs: deadline ? deadline.getTime() - now.getTime() : null,
-    label,
-  };
-}
-
-// ---------------------------------------------------------------------------
 // Auto-assignment (branch coverage)
 // ---------------------------------------------------------------------------
 
@@ -188,7 +118,7 @@ export function isAssignmentActive(assignment: BranchAssignment, now: Date = new
 }
 
 /**
- * Returns the IT staff member whose active branch assignment covers the given
+ * Returns the IT specialist member whose active branch assignment covers the given
  * branch. When multiple staff cover the branch, the least-loaded one (fewest
  * open tickets) is preferred for load balancing.
  */
@@ -202,7 +132,7 @@ export function findAssignableItStaff(state: AppState, branchId: string): User |
 
   const openTicketsFor = (u: User): number =>
     state.tickets.filter(
-      (t) => t.assignedToId === u.id && t.status !== 'Closed' && t.status !== 'Cancelled'
+      (t) => t.assignedToId === u.id && t.status !== 'Closed'
     ).length;
 
   return [...candidates].sort((a, b) => openTicketsFor(a) - openTicketsFor(b))[0];
@@ -216,7 +146,6 @@ export interface CreateTicketParams {
   subject: string;
   description: string;
   category: TicketCategory;
-  priority: TicketPriority;
   attachmentName?: string;
   currentUser: User;
 }
@@ -225,7 +154,7 @@ export function createTicket(state: AppState, params: CreateTicketParams): AppSt
   const id = `IT-${String(state.ticketCounter).padStart(6, '0')}`;
   const nowStr = nowDisplay();
 
-  // Auto-assign to the IT staff member whose active branch assignment covers
+  // Auto-assign to the IT specialist member whose active branch assignment covers
   // the requester's branch (least-loaded when multiple staff cover it).
   const assignedStaff = params.currentUser.branchId
     ? findAssignableItStaff(state, params.currentUser.branchId)
@@ -236,8 +165,7 @@ export function createTicket(state: AppState, params: CreateTicketParams): AppSt
     subject: params.subject,
     description: params.description,
     category: params.category,
-    priority: params.priority,
-    status: assignedStaff ? 'Assigned' : 'New',
+    status: assignedStaff ? 'Assigned' : 'Pending',
     requesterId: params.currentUser.id,
     requesterName: params.currentUser.name,
     branchId: params.currentUser.branchId || 'br-001',
@@ -270,7 +198,7 @@ export function createTicket(state: AppState, params: CreateTicketParams): AppSt
     actorName: params.currentUser.name,
     actorRole: params.currentUser.role,
     action: 'Ticket submitted',
-    details: `Category: ${params.category} | Priority: ${params.priority}`,
+    details: `Category: ${params.category}`,
     type: 'creation',
   });
 
@@ -309,7 +237,7 @@ export function createTicket(state: AppState, params: CreateTicketParams): AppSt
     });
   }
 
-  // Notify every IT staff member and administrator, not just one person.
+  // Notify every IT specialist member and administrator, not just one person.
   const supportUsers = next.users.filter(
     (u) => u.role === 'IT_STAFF' || u.role === 'ADMINISTRATOR'
   );
@@ -385,7 +313,7 @@ export function updateTicketStatus(
     });
   }
 
-  // A branch user updating a ticket should notify the assigned IT staff.
+  // A branch user updating a ticket should notify the assigned IT specialist.
   if (!actorIsSupport && tickets[index].assignedToId) {
     next = withNotification(next, {
       userId: tickets[index].assignedToId!,
@@ -413,7 +341,7 @@ export function assignTicket(
     ...tickets[index],
     assignedToId: staffUser.id,
     assignedToName: staffUser.name,
-    status: tickets[index].status === 'New' ? 'Assigned' : tickets[index].status,
+    status: tickets[index].status === 'Pending' ? 'Assigned' : tickets[index].status,
     updatedAt: nowDisplay(),
   };
 
@@ -434,37 +362,6 @@ export function assignTicket(
     action: 'ASSIGN_TICKET',
     targetId: ticketId,
     details: `Assigned #${ticketId} to ${staffUser.name}`,
-  });
-
-  return next;
-}
-
-export function updateTicketPriority(
-  state: AppState,
-  ticketId: string,
-  newPriority: TicketPriority,
-  currentUser: User
-): AppState {
-  const index = state.tickets.findIndex((t) => t.id === ticketId);
-  if (index === -1) return state;
-
-  const tickets = [...state.tickets];
-  const oldPriority = tickets[index].priority;
-  tickets[index] = {
-    ...tickets[index],
-    priority: newPriority,
-    updatedAt: nowDisplay(),
-  };
-
-  let next: AppState = { ...state, tickets };
-
-  next = withTimeline(next, {
-    ticketId,
-    actorName: currentUser.name,
-    actorRole: currentUser.role,
-    action: 'Priority adjusted',
-    details: `Priority updated from ${oldPriority} to ${newPriority} (IT Review)`,
-    type: 'status_change',
   });
 
   return next;
@@ -557,6 +454,8 @@ export interface UpdateUserChanges {
   passwordHash?: string;
   /** True to force the user to change the password on next login. */
   mustChangePassword?: boolean;
+  /** True when the user requested a password reset (awaiting admin action). */
+  passwordResetRequested?: boolean;
 }
 
 export function createUser(state: AppState, params: CreateUserParams, currentUser: User): AppState {
@@ -587,6 +486,86 @@ export function createUser(state: AppState, params: CreateUserParams, currentUse
     details: `Created account for ${user.name} (${user.username}) as ${user.role}`,
   });
 
+  return next;
+}
+
+/**
+ * Password reset request (self-service, no login required). Marks the account,
+ * notifies every administrator, and records an audit entry. Returns the
+ * unchanged state when the username does not match any account.
+ *
+ * Administrator accounts never use the "notify the admins" path — the person
+ * who forgot the password IS the admin, so notifying would just notify
+ * themselves. Instead the caller must go through the recovery-key flow.
+ */
+export function requestPasswordReset(
+  state: AppState,
+  username: string
+): { state: AppState; user: User | undefined; requiresRecoveryKey: boolean } {
+  const user = state.users.find(
+    (u) => u.username.toLowerCase() === username.trim().toLowerCase()
+  );
+  if (!user) return { state, user: undefined, requiresRecoveryKey: false };
+
+  if (user.role === 'ADMINISTRATOR') {
+    return { state, user, requiresRecoveryKey: true };
+  }
+
+  const users = state.users.map((u) =>
+    u.id === user.id ? { ...u, passwordResetRequested: true } : u
+  );
+
+  let next: AppState = { ...state, users };
+
+  const admins = next.users.filter((u) => u.role === 'ADMINISTRATOR');
+  for (const admin of admins) {
+    next = withNotification(next, {
+      userId: admin.id,
+      ticketId: user.id,
+      title: 'Password reset requested',
+      message: `${user.name} (${user.username}) requested a password reset. Set a new one from Admin → Users.`,
+      type: 'warning',
+    });
+  }
+
+  next = withAudit(next, {
+    actorName: user.name,
+    actorRole: user.role,
+    action: 'REQUEST_PASSWORD_RESET',
+    targetId: user.id,
+    details: `Password reset requested for ${user.name} (${user.username})`,
+  });
+
+  return { state: next, user, requiresRecoveryKey: false };
+}
+
+/**
+ * Recovery-key password rotation for an administrator who cannot log in. Sets a
+ * fresh password hash, forces a change on next login, clears any reset flag,
+ * and records an audit entry. `newPasswordHash` must be pre-computed (scrypt).
+ */
+export function performAdminRecovery(
+  state: AppState,
+  user: User,
+  newPasswordHash: string
+): AppState {
+  let next = updateUser(
+    state,
+    user.id,
+    {
+      passwordHash: newPasswordHash,
+      mustChangePassword: true,
+      passwordResetRequested: false,
+    },
+    user
+  );
+  next = withAudit(next, {
+    actorName: user.name,
+    actorRole: user.role,
+    action: 'ADMIN_RECOVERY',
+    targetId: user.id,
+    details: `Admin password recovered via recovery key (one-time password issued)`,
+  });
   return next;
 }
 
@@ -649,9 +628,9 @@ export function deleteUser(state: AppState, userId: string, currentUser: User): 
 }
 
 export interface CreateBranchParams {
-  code: string;
   name: string;
   location: string;
+  code?: string;
   status: 'Active' | 'Inactive';
   userCount?: number;
 }
@@ -660,9 +639,9 @@ export function createBranch(state: AppState, params: CreateBranchParams, curren
   const id = nextId('br', state);
   const branch: Branch = {
     id,
-    code: params.code.trim().toUpperCase(),
     name: params.name.trim(),
     location: params.location.trim(),
+    code: params.code?.trim(),
     status: params.status,
     userCount: params.userCount ?? 0,
   };
@@ -677,7 +656,7 @@ export function createBranch(state: AppState, params: CreateBranchParams, curren
     actorRole: currentUser.role,
     action: 'CREATE_BRANCH',
     targetId: id,
-    details: `Added branch ${branch.name} (${branch.code})`,
+    details: `Added branch ${branch.name}`,
   });
 
   return next;
@@ -696,9 +675,9 @@ export function updateBranch(
   branches[index] = {
     ...branches[index],
     ...changes,
-    code: changes.code?.trim().toUpperCase() ?? branches[index].code,
     name: changes.name?.trim() ?? branches[index].name,
     location: changes.location?.trim() ?? branches[index].location,
+    code: changes.code?.trim() ?? branches[index].code,
   };
 
   let next: AppState = { ...state, branches };
@@ -728,14 +707,14 @@ export function deleteBranch(state: AppState, branchId: string, currentUser: Use
     actorRole: currentUser.role,
     action: 'DELETE_BRANCH',
     targetId: branchId,
-    details: `Removed branch ${branch.name} (${branch.code})`,
+    details: `Removed branch ${branch.name}`,
   });
 
   return next;
 }
 
 // ---------------------------------------------------------------------------
-// IT staff branch assignments
+// IT specialist branch assignments
 // ---------------------------------------------------------------------------
 
 export function buildBranchAssignment(
@@ -769,6 +748,23 @@ export function updateStaffAssignments(
 
   let next: AppState = { ...state, users };
 
+  // Auto-assign previously-unassigned tickets whose branch is now covered by
+  // this IT specialist.
+  const staff = users[index];
+  const coveredBranchIds = new Set(
+    assignments.filter((a) => isAssignmentActive(a)).map((a) => a.branchId)
+  );
+
+  const pendingTicketIds = next.tickets
+    .filter(
+      (t) => !t.assignedToId && t.status === 'Pending' && coveredBranchIds.has(t.branchId)
+    )
+    .map((t) => t.id);
+
+  for (const ticketId of pendingTicketIds) {
+    next = assignTicket(next, ticketId, staff, currentUser);
+  }
+
   next = withAudit(next, {
     actorName: currentUser.name,
     actorRole: currentUser.role,
@@ -788,7 +784,7 @@ export const getRoleLabel = (role: UserRole): string => {
     case 'BRANCH_USER':
       return 'Branch User';
     case 'IT_STAFF':
-      return 'IT Staff';
+      return 'IT Specialist';
     case 'ADMINISTRATOR':
       return 'Administrator';
     case 'AUDITOR':

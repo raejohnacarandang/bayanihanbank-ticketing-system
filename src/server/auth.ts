@@ -6,7 +6,16 @@
 import { createHash, createHmac, randomBytes, scryptSync, timingSafeEqual } from 'crypto';
 import { AppState, User, UserRole } from '../types';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'bayanihan-bank-demo-secret-change-me';
+const JWT_SECRET_FALLBACK = 'bayanihan-bank-demo-secret-change-me';
+/**
+ * Resolved lazily (not at module load) because `dotenv.config()` runs in the
+ * mysql/server modules AFTER this module is imported/evaluated in the ESM
+ * bundle — a top-level `process.env.JWT_SECRET` const would always capture the
+ * fallback. Reading it per-call guarantees `.env` values take effect.
+ */
+function jwtSecret(): string {
+  return process.env.JWT_SECRET || JWT_SECRET_FALLBACK;
+}
 const TOKEN_TTL_MS = 1000 * 60 * 60 * 12; // 12 hours
 const DEMO_PASSWORD = 'password123';
 
@@ -55,7 +64,7 @@ export function signToken(user: User): string {
     exp: now + Math.floor(TOKEN_TTL_MS / 1000),
   };
   const body = b64url(JSON.stringify(payload));
-  const signature = createHmac('sha256', JWT_SECRET).update(`${header}.${body}`).digest('base64url');
+  const signature = createHmac('sha256', jwtSecret()).update(`${header}.${body}`).digest('base64url');
   return `${header}.${body}.${signature}`;
 }
 
@@ -63,7 +72,7 @@ export function verifyToken(token: string): TokenPayload | null {
   const parts = token.split('.');
   if (parts.length !== 3) return null;
   const [header, body, signature] = parts;
-  const expected = createHmac('sha256', JWT_SECRET).update(`${header}.${body}`).digest('base64url');
+  const expected = createHmac('sha256', jwtSecret()).update(`${header}.${body}`).digest('base64url');
   const actual = Buffer.from(signature);
   const expectedBuf = Buffer.from(expected);
   if (actual.length !== expectedBuf.length || !timingSafeEqual(actual, expectedBuf)) {

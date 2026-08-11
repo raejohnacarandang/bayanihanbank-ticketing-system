@@ -93,22 +93,22 @@ export const INITIAL_USERS: User[] = [
 ];
 
 export const INITIAL_BRANCHES: Branch[] = [
-  { id: 'br-001', code: 'UNS-01', name: 'Unisan Branch', location: 'Unisan, Quezon', status: 'Active', userCount: 12 },
-  { id: 'br-002', code: 'ATM-02', name: 'Atimonan Branch', location: 'Atimonan, Quezon', status: 'Active', userCount: 15 },
-  { id: 'br-003', code: 'LCN-03', name: 'Lucena Branch', location: 'Lucena City, Quezon', status: 'Active', userCount: 28 },
-  { id: 'br-004', code: 'GMC-04', name: 'Gumaca Branch', location: 'Gumaca, Quezon', status: 'Active', userCount: 10 },
-  { id: 'br-005', code: 'QZN-05', name: 'Quezon Branch', location: 'Quezon, Quezon', status: 'Active', userCount: 8 },
-  { id: 'br-006', code: 'HQ-00', name: 'Main IT / Head Office', location: 'Lucena City, Quezon', status: 'Active', userCount: 25 },
+  { id: 'br-001', name: 'Unisan Branch', location: 'Unisan, Quezon', status: 'Active', userCount: 12 },
+  { id: 'br-002', name: 'Atimonan Branch', location: 'Atimonan, Quezon', status: 'Active', userCount: 15 },
+  { id: 'br-003', name: 'Lucena Branch', location: 'Lucena City, Quezon', status: 'Active', userCount: 28 },
+  { id: 'br-004', name: 'Gumaca Branch', location: 'Gumaca, Quezon', status: 'Active', userCount: 10 },
+  { id: 'br-005', name: 'Quezon Branch', location: 'Quezon, Quezon', status: 'Active', userCount: 8 },
+  { id: 'br-006', name: 'Main IT / Head Office', location: 'Lucena City, Quezon', status: 'Active', userCount: 25 },
 ];
 
 export const INITIAL_CATEGORIES: CategoryInfo[] = [
-  { id: 'cat-01', name: 'Hardware', description: 'Computers, printers, scanners, passbook printers, monitors', slaTargetHours: '4 - 24 hrs (TBD)', slaHours: 24, status: 'Active' },
-  { id: 'cat-02', name: 'Software', description: 'Core banking terminals, MS Office, specialized banking apps', slaTargetHours: '4 - 12 hrs (TBD)', slaHours: 12, status: 'Active' },
-  { id: 'cat-03', name: 'Network', description: 'LAN/WAN, internet connectivity, VPN tunnel, router/switch', slaTargetHours: '1 - 4 hrs (TBD)', slaHours: 4, status: 'Active' },
-  { id: 'cat-04', name: 'Account & Access', description: 'User account unlocks, password resets, system authorization', slaTargetHours: '2 - 8 hrs (TBD)', slaHours: 8, status: 'Active' },
-  { id: 'cat-05', name: 'Installation / Configuration', description: 'New workstation setup, peripheral installation', slaTargetHours: '24 - 48 hrs (TBD)', slaHours: 48, status: 'Active' },
-  { id: 'cat-06', name: 'IT Equipment', description: 'Requisition or replacement of IT accessories', slaTargetHours: '24 - 72 hrs (TBD)', slaHours: 72, status: 'Active' },
-  { id: 'cat-07', name: 'Other IT Concern', description: 'Miscellaneous IT inquiries and requests', slaTargetHours: '24 - 48 hrs (TBD)', slaHours: 48, status: 'Active' },
+  { id: 'cat-01', name: 'Hardware', description: 'Computers, printers, scanners, passbook printers, monitors', status: 'Active' },
+  { id: 'cat-02', name: 'Software', description: 'Core banking terminals, MS Office, specialized banking apps', status: 'Active' },
+  { id: 'cat-03', name: 'Network', description: 'LAN/WAN, internet connectivity, VPN tunnel, router/switch', status: 'Active' },
+  { id: 'cat-04', name: 'Account & Access', description: 'User account unlocks, password resets, system authorization', status: 'Active' },
+  { id: 'cat-05', name: 'Installation / Configuration', description: 'New workstation setup, peripheral installation', status: 'Active' },
+  { id: 'cat-06', name: 'IT Equipment', description: 'Requisition or replacement of IT accessories', status: 'Active' },
+  { id: 'cat-07', name: 'Other IT Concern', description: 'Miscellaneous IT inquiries and requests', status: 'Active' },
 ];
 
 export const INITIAL_TICKETS: Ticket[] = [
@@ -117,7 +117,6 @@ export const INITIAL_TICKETS: Ticket[] = [
     subject: 'Computer cannot connect to network',
     description: 'Tellering Station 2 desktop computer suddenly lost LAN connection. Core banking portal cannot be reached. Cables checked.',
     category: 'Network',
-    priority: 'High',
     status: 'In Progress',
     requesterId: 'usr-002',
     requesterName: 'Maria Santos',
@@ -134,7 +133,6 @@ export const INITIAL_TICKETS: Ticket[] = [
     subject: 'Printer not working',
     description: 'The passbook and receipt printer at Counter 1 is making grinding noise and failing to feed papers.',
     category: 'Hardware',
-    priority: 'Medium',
     status: 'Assigned',
     requesterId: 'usr-001',
     requesterName: 'Juan Dela Cruz',
@@ -150,8 +148,7 @@ export const INITIAL_TICKETS: Ticket[] = [
     subject: 'Request for software installation',
     description: 'Need new PDF reader and updated antivirus software installed on New Accounts desk workstation.',
     category: 'Software',
-    priority: 'Low',
-    status: 'New',
+    status: 'Pending',
     requesterId: 'usr-001',
     requesterName: 'Juan Dela Cruz',
     branchId: 'br-003',
@@ -164,7 +161,6 @@ export const INITIAL_TICKETS: Ticket[] = [
     subject: 'VPN connection issue',
     description: 'Branch manager laptop unable to establish secure VPN link to Head Office database after recent Windows update.',
     category: 'Network',
-    priority: 'High',
     status: 'Resolved',
     requesterId: 'usr-002',
     requesterName: 'Maria Santos',
@@ -182,7 +178,6 @@ export const INITIAL_TICKETS: Ticket[] = [
     subject: 'Computer performance issue',
     description: 'Accountant desk PC taking over 10 minutes to boot up and freezing during report generation.',
     category: 'Hardware',
-    priority: 'Low',
     status: 'Closed',
     requesterId: 'usr-001',
     requesterName: 'Juan Dela Cruz',

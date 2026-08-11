@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Ticket, User } from '../types';
-import { StatusBadge, PriorityBadge, SlaBadge } from '../components/Badge';
-import { slaStatusFor } from '../services/store';
+import { StatusBadge } from '../components/Badge';
 import {
   Ticket as TicketIcon,
   AlertCircle,
@@ -15,7 +14,6 @@ import {
   Search,
   Filter,
   ShieldAlert,
-  AlarmClockOff,
   ArrowRight
 } from 'lucide-react';
 
@@ -36,25 +34,20 @@ export const ItDashboardView: React.FC<ItDashboardViewProps> = ({
   const [statusFilter, setStatusFilter] = useState('ALL');
 
   const totalCount = tickets.length;
-  const newCount = tickets.filter((t) => t.status === 'New').length;
   const assignedCount = tickets.filter((t) => t.status === 'Assigned').length;
   const inProgressCount = tickets.filter((t) => t.status === 'In Progress').length;
   const pendingCount = tickets.filter((t) => t.status === 'Pending').length;
   const resolvedCount = tickets.filter((t) => t.status === 'Resolved').length;
-  const criticalCount = tickets.filter((t) => t.priority === 'Critical' && t.status !== 'Closed').length;
-  const slaBreachedCount = tickets.filter((t) => slaStatusFor(t) === 'breached').length;
 
   // Branch names list
   const branchesList = Array.from(new Set(tickets.map((t) => t.branchName)));
 
   // Tickets requiring immediate IT attention
   const attentionTickets = tickets.filter((t) => {
-    const isUnclosed = t.status !== 'Closed' && t.status !== 'Cancelled';
+    const isUnclosed = t.status !== 'Closed';
     const matchesBranch = branchFilter === 'ALL' || t.branchName === branchFilter;
     const matchesStatus =
       statusFilter === 'ALL' ||
-      (statusFilter === 'CRITICAL' && t.priority === 'Critical') ||
-      (statusFilter === 'SLA_BREACHED' && slaStatusFor(t) === 'breached') ||
       t.status === statusFilter;
     return isUnclosed && matchesBranch && matchesStatus;
   });
@@ -78,7 +71,7 @@ export const ItDashboardView: React.FC<ItDashboardViewProps> = ({
 
         <button
           onClick={onNavigateAllTickets}
-          className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl transition shadow-md flex items-center gap-2 cursor-pointer self-start md:self-auto"
+          className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition shadow-md flex items-center gap-2 cursor-pointer self-start md:self-auto"
         >
           <span>View All IT Queue</span>
           <ArrowRight className="w-4 h-4" />
@@ -86,37 +79,20 @@ export const ItDashboardView: React.FC<ItDashboardViewProps> = ({
       </div>
 
       {/* Metric Cards Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-8 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         <div
           onClick={() => setStatusFilter('ALL')}
           className={`p-3.5 rounded-xl border transition cursor-pointer ${
             statusFilter === 'ALL'
-              ? 'bg-slate-900 text-white border-slate-800 shadow-md ring-2 ring-blue-500'
+              ? 'bg-slate-900 text-white border-slate-800 shadow-md ring-2 ring-emerald-500'
               : 'bg-white border-slate-200 shadow-2xs'
           }`}
         >
           <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 flex items-center justify-between">
             <span>Total</span>
-            <TicketIcon className={`w-3.5 h-3.5 ${statusFilter === 'ALL' ? 'text-blue-300' : 'text-slate-400'}`} />
+            <TicketIcon className={`w-3.5 h-3.5 ${statusFilter === 'ALL' ? 'text-emerald-300' : 'text-slate-400'}`} />
           </div>
           <div className="text-2xl font-black mt-1">{totalCount}</div>
-        </div>
-
-        <div
-          onClick={() => setStatusFilter('New')}
-          className={`p-3.5 rounded-xl border transition cursor-pointer ${
-            statusFilter === 'New'
-              ? 'bg-blue-900 text-white border-blue-800 shadow-md ring-2 ring-blue-400'
-              : 'bg-blue-50/70 border-blue-200 shadow-2xs'
-          }`}
-        >
-          <div className={`text-[10px] font-bold uppercase tracking-wider flex items-center justify-between ${
-            statusFilter === 'New' ? 'text-blue-300' : 'text-blue-700'
-          }`}>
-            <span>New</span>
-            <AlertCircle className={`w-3.5 h-3.5 ${statusFilter === 'New' ? 'text-blue-300' : 'text-blue-600'}`} />
-          </div>
-          <div className={`text-2xl font-black mt-1 ${statusFilter === 'New' ? 'text-blue-50' : 'text-blue-900'}`}>{newCount}</div>
         </div>
 
         <div
@@ -186,40 +162,6 @@ export const ItDashboardView: React.FC<ItDashboardViewProps> = ({
           </div>
           <div className={`text-2xl font-black mt-1 ${statusFilter === 'Resolved' ? 'text-emerald-50' : 'text-emerald-900'}`}>{resolvedCount}</div>
         </div>
-
-        <div
-          onClick={() => setStatusFilter('CRITICAL')}
-          className={`p-3.5 rounded-xl border transition cursor-pointer ${
-            statusFilter === 'CRITICAL'
-              ? 'bg-red-900 text-white border-red-800 shadow-md ring-2 ring-red-400'
-              : 'bg-red-50/70 border-red-200 shadow-2xs'
-          }`}
-        >
-          <div className={`text-[10px] font-bold uppercase tracking-wider flex items-center justify-between ${
-            statusFilter === 'CRITICAL' ? 'text-red-300' : 'text-red-700'
-          }`}>
-            <span>Critical</span>
-            <ShieldAlert className={`w-3.5 h-3.5 ${statusFilter === 'CRITICAL' ? 'text-red-300' : 'text-red-600'}`} />
-          </div>
-          <div className={`text-2xl font-black mt-1 ${statusFilter === 'CRITICAL' ? 'text-red-50' : 'text-red-900'}`}>{criticalCount}</div>
-        </div>
-
-        <div
-          onClick={() => setStatusFilter('SLA_BREACHED')}
-          className={`p-3.5 rounded-xl border transition cursor-pointer ${
-            statusFilter === 'SLA_BREACHED'
-              ? 'bg-red-900 text-white border-red-800 shadow-md ring-2 ring-red-400'
-              : slaBreachedCount > 0 ? 'bg-red-100/80 border-red-300' : 'bg-slate-50/70 border-slate-200'
-          }`}
-        >
-          <div className={`text-[10px] font-bold uppercase tracking-wider flex items-center justify-between ${
-            statusFilter === 'SLA_BREACHED' ? 'text-red-300' : 'text-red-700'
-          }`}>
-            <span>SLA Breached</span>
-            <AlarmClockOff className={`w-3.5 h-3.5 ${statusFilter === 'SLA_BREACHED' ? 'text-red-300' : 'text-red-600'}`} />
-          </div>
-          <div className={`text-2xl font-black mt-1 ${statusFilter === 'SLA_BREACHED' ? 'text-red-50' : slaBreachedCount > 0 ? 'text-red-900' : 'text-slate-500'}`}>{slaBreachedCount}</div>
-        </div>
       </div>
 
       {/* Tickets Requiring IT Attention */}
@@ -240,7 +182,7 @@ export const ItDashboardView: React.FC<ItDashboardViewProps> = ({
             <select
               value={branchFilter}
               onChange={(e) => setBranchFilter(e.target.value)}
-              className="px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-xl text-slate-800 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-600"
+              className="px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-xl text-slate-800 font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-600"
             >
               <option value="ALL">All Branches</option>
               {branchesList.map((b) => (
@@ -265,9 +207,7 @@ export const ItDashboardView: React.FC<ItDashboardViewProps> = ({
                   <th className="py-3 px-4">Branch</th>
                   <th className="py-3 px-4">Subject</th>
                   <th className="py-3 px-4">Category</th>
-                  <th className="py-3 px-4">Priority</th>
                   <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4">SLA</th>
                   <th className="py-3 px-4">Assigned To</th>
                   <th className="py-3 px-4">Submitted</th>
                   <th className="py-3 px-4 text-right">Action</th>
@@ -278,9 +218,9 @@ export const ItDashboardView: React.FC<ItDashboardViewProps> = ({
                   <tr
                     key={ticket.id}
                     onClick={() => onNavigateTicketDetail(ticket.id)}
-                    className="hover:bg-blue-50/40 transition cursor-pointer group"
+                    className="hover:bg-emerald-50/40 transition cursor-pointer group"
                   >
-                    <td className="py-3 px-4 font-mono font-bold text-blue-900 group-hover:underline">
+                    <td className="py-3 px-4 font-mono font-bold text-emerald-900 group-hover:underline">
                       #{ticket.id}
                     </td>
                     <td className="py-3 px-4 font-bold text-slate-800 whitespace-nowrap">
@@ -291,13 +231,7 @@ export const ItDashboardView: React.FC<ItDashboardViewProps> = ({
                     </td>
                     <td className="py-3 px-4 text-slate-600">{ticket.category}</td>
                     <td className="py-3 px-4">
-                      <PriorityBadge priority={ticket.priority} size="sm" />
-                    </td>
-                    <td className="py-3 px-4">
                       <StatusBadge status={ticket.status} size="sm" />
-                    </td>
-                    <td className="py-3 px-4">
-                      <SlaBadge ticket={ticket} size="sm" />
                     </td>
                     <td className="py-3 px-4 text-slate-700 whitespace-nowrap">
                       {ticket.assignedToName || (
@@ -313,7 +247,7 @@ export const ItDashboardView: React.FC<ItDashboardViewProps> = ({
                           e.stopPropagation();
                           onNavigateTicketDetail(ticket.id);
                         }}
-                        className="px-2.5 py-1 rounded bg-blue-900 text-white hover:bg-blue-800 font-bold transition inline-flex items-center gap-1 cursor-pointer"
+                        className="px-2.5 py-1 rounded bg-emerald-900 text-white hover:bg-emerald-800 font-bold transition inline-flex items-center gap-1 cursor-pointer"
                       >
                         <Eye className="w-3.5 h-3.5" />
                         <span>Manage</span>

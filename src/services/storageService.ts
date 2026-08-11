@@ -17,7 +17,6 @@ import {
   CategoryInfo,
   Comment,
   Ticket,
-  TicketPriority,
   TicketStatus,
   TimelineEvent,
   NotificationItem,
@@ -36,7 +35,6 @@ import {
   markAllNotificationsAsRead as localMarkAllNotificationsAsRead,
   markNotificationAsRead as localMarkNotificationAsRead,
   updateBranch as localUpdateBranch,
-  updateTicketPriority as localUpdateTicketPriority,
   updateTicketStatus as localUpdateTicketStatus,
   updateStaffAssignments as localUpdateStaffAssignments,
   updateUser as localUpdateUser,
@@ -192,6 +190,27 @@ class StorageService {
     this.clearSession();
   }
 
+  /** Self-service password reset request (public, no session required). */
+  public async requestPasswordReset(
+    username: string
+  ): Promise<{ requiresRecoveryKey?: boolean }> {
+    return this.api<{ requiresRecoveryKey?: boolean }>('/api/auth/reset-request', {
+      method: 'POST',
+      body: JSON.stringify({ username }),
+    });
+  }
+
+  /**
+   * Recovery-key password reset for administrator accounts (public). Returns
+   * the one-time password issued for the account.
+   */
+  public async adminRecovery(username: string, key: string): Promise<{ oneTimePassword: string }> {
+    return this.api<{ oneTimePassword: string }>('/api/auth/admin-recovery', {
+      method: 'POST',
+      body: JSON.stringify({ username, key }),
+    });
+  }
+
   /** Change the signed-in user's password (verifies the current password). */
   public async changePassword(currentPassword: string, newPassword: string): Promise<User> {
     try {
@@ -282,7 +301,6 @@ class StorageService {
     subject: string;
     description: string;
     category: Ticket['category'];
-    priority: Ticket['priority'];
     attachmentName?: string;
   }): Promise<Ticket> {
     try {
@@ -329,24 +347,6 @@ class StorageService {
       return json.ticket ?? this.cache.tickets.find((t) => t.id === ticketId);
     } catch {
       this.cache = localAssignTicket(this.cache, ticketId, staffUser, this.cache.currentUser);
-      this.mirror();
-      return this.cache.tickets.find((t) => t.id === ticketId);
-    }
-  }
-
-  public async updateTicketPriority(
-    ticketId: string,
-    newPriority: TicketPriority
-  ): Promise<Ticket | undefined> {
-    try {
-      const json = await this.api<{ ticket?: Ticket }>(`/api/tickets/${ticketId}/priority`, {
-        method: 'PATCH',
-        body: JSON.stringify({ newPriority }),
-      });
-      await this.refresh();
-      return json.ticket ?? this.cache.tickets.find((t) => t.id === ticketId);
-    } catch {
-      this.cache = localUpdateTicketPriority(this.cache, ticketId, newPriority, this.cache.currentUser);
       this.mirror();
       return this.cache.tickets.find((t) => t.id === ticketId);
     }

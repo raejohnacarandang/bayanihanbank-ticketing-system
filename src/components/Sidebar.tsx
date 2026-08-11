@@ -21,31 +21,34 @@ import {
   Sliders,
   ChevronRight,
   LogOut,
-  BarChart3
+  BarChart3,
+  X
 } from 'lucide-react';
 
 interface SidebarProps {
   currentUser: User;
+  activeView: ActiveView;
   newTicketCount: number;
-  myOpenTicketCount: number;
   onNavigate: (view: ActiveView) => void;
   onLogout: () => void;
   isOpen: boolean;
   onCloseMobile: () => void;
+  myOpenTicketCount: number;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
   currentUser,
+  activeView: activeViewProp,
   newTicketCount,
-  myOpenTicketCount,
   onNavigate,
   onLogout,
   isOpen,
   onCloseMobile,
+  myOpenTicketCount,
 }) => {
   const location = useLocation();
   const parsed = parsePath(location.pathname);
-  const activeView = parsed?.view ?? 'dashboard';
+  const activeView = activeViewProp ?? (parsed?.view ?? 'dashboard');
   const adminTab = parsed?.adminTab;
 
   const isBranchUser = currentUser.role === 'BRANCH_USER';
@@ -62,8 +65,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         : activeView === view;
     return `w-full flex items-center justify-between px-4 py-3 rounded-lg text-sm font-semibold transition-colors cursor-pointer ${
       isActive
-        ? 'bg-emerald-800 text-amber-300 shadow-sm border border-emerald-700/60'
-        : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+        ? 'bg-gradient-to-r from-emerald-800 to-emerald-900 text-amber-300 shadow-sm border border-emerald-700/60'
+        : 'text-slate-400 hover:bg-slate-800/70 hover:text-white'
     }`;
   };
 
@@ -83,15 +86,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
           isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         }`}
       >
+        {/* Close Button */}
+        <div className="flex justify-end mb-4">
+          <button
+            onClick={onCloseMobile}
+            className="p-2 rounded-lg bg-slate-800/50 hover:bg-slate-700/70 text-slate-300 hover:text-white transition-colors"
+            aria-label="Close sidebar"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
         <div className="space-y-6">
           {/* User Profile Summary Box */}
-          <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/60 flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center shrink-0 border border-blue-400/30">
+          <div className="bg-emerald-900/40 p-3 rounded-xl border border-emerald-800/60 flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-800 text-white font-bold flex items-center justify-center shrink-0 border border-emerald-300/40 shadow-sm">
               {currentUser.name.charAt(0)}
             </div>
             <div className="min-w-0 flex-1">
               <div className="text-xs font-bold text-white truncate">{currentUser.name}</div>
-              <div className="text-[11px] text-blue-300 font-medium truncate">
+              <div className="text-[11px] text-emerald-300 font-medium truncate">
                 {currentUser.branchName || currentUser.department || 'Bayanihan Bank'}
               </div>
             </div>
@@ -112,7 +126,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               className={navItemClass('dashboard')}
             >
               <div className="flex items-center gap-2.5">
-                <LayoutDashboard className="w-4 h-4 text-blue-400" />
+                <LayoutDashboard className="w-4 h-4 text-emerald-400" />
                 <span>Dashboard</span>
               </div>
               <ChevronRight className="w-3.5 h-3.5 opacity-40" />
@@ -168,9 +182,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   className={navItemClass('all_tickets')}
                 >
                   <div className="flex items-center gap-2.5">
-                    <Inbox className="w-4 h-4 text-blue-400" />
+                    <Inbox className="w-4 h-4 text-emerald-400" />
                     <span>All IT Tickets</span>
                   </div>
+                  {newTicketCount > 0 && (
+                    <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-bold px-2 py-0.5 rounded-full">
+                      {newTicketCount}
+                    </span>
+                  )}
                 </button>
 
                 <button
@@ -225,9 +244,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   className={navItemClass('all_tickets')}
                 >
                   <div className="flex items-center gap-2.5">
-                    <TicketIcon className="w-4 h-4 text-blue-400" />
+                    <TicketIcon className="w-4 h-4 text-emerald-400" />
                     <span>All Tickets</span>
                   </div>
+                  {newTicketCount > 0 && (
+                    <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-bold px-2 py-0.5 rounded-full">
+                      {newTicketCount}
+                    </span>
+                  )}
                 </button>
 
                 <button
@@ -252,7 +276,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 >
                   <div className="flex items-center gap-2.5">
                     <UserCheck className="w-4 h-4 text-sky-400" />
-                    <span>IT Staff Settings</span>
+                    <span>IT Specialist Settings</span>
                   </div>
                 </button>
 
@@ -303,7 +327,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   className={navItemClass('reports')}
                 >
                   <div className="flex items-center gap-2.5">
-                    <BarChart3 className="w-4 h-4 text-blue-400" />
+                    <BarChart3 className="w-4 h-4 text-emerald-400" />
                     <span>Reports & Analytics</span>
                   </div>
                 </button>
@@ -321,7 +345,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   className={navItemClass('all_tickets')}
                 >
                   <div className="flex items-center gap-2.5">
-                    <TicketIcon className="w-4 h-4 text-blue-400" />
+                    <TicketIcon className="w-4 h-4 text-emerald-400" />
                     <span>All Tickets</span>
                   </div>
                   <span className="text-[10px] bg-teal-500/20 text-teal-300 font-bold px-1.5 py-0.5 rounded">
@@ -350,7 +374,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   className={navItemClass('reports')}
                 >
                   <div className="flex items-center gap-2.5">
-                    <BarChart3 className="w-4 h-4 text-blue-400" />
+                    <BarChart3 className="w-4 h-4 text-emerald-400" />
                     <span>Reports & Analytics</span>
                   </div>
                 </button>
@@ -411,12 +435,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <span className="font-semibold text-slate-200 block mb-0.5">
               BB IT Service Desk v1.0
             </span>
-            Bayanihan Bank Prototype Concept (August 2026)
+            Bayanihan Bank IT Service Desk (August 2026)
           </div>
 
           <button
             onClick={onLogout}
-            className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-red-950/50 hover:bg-red-900/80 text-red-300 text-xs font-semibold transition border border-red-900/50 cursor-pointer"
+            className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-red-950/40 hover:bg-red-900/70 text-red-300 text-xs font-semibold transition border border-red-900/40 cursor-pointer"
           >
             <LogOut className="w-3.5 h-3.5" />
             <span>Exit Demo Session</span>

@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Ticket, User, TicketCategory, TicketPriority, TicketStatus } from '../types';
-import { StatusBadge, PriorityBadge, SlaBadge } from '../components/Badge';
-import { slaInfoFor } from '../services/store';
+import { Ticket, User, TicketCategory, TicketStatus } from '../types';
+import { StatusBadge } from '../components/Badge';
 import { Search, Filter, X, Eye, Ticket as TicketIcon, PlusCircle, Building, UserCheck, Download, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const PAGE_SIZE = 10;
@@ -31,7 +30,6 @@ export const TicketListView: React.FC<TicketListViewProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>(initialStatusFilter ?? 'ALL');
-  const [priorityFilter, setPriorityFilter] = useState<string>('ALL');
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
   const [branchFilter, setBranchFilter] = useState<string>('ALL');
   const [assignedFilter, setAssignedFilter] = useState<string>('ALL');
@@ -50,7 +48,6 @@ export const TicketListView: React.FC<TicketListViewProps> = ({
   const handleClearFilters = () => {
     setSearchTerm('');
     setStatusFilter('ALL');
-    setPriorityFilter('ALL');
     setCategoryFilter('ALL');
     setBranchFilter('ALL');
     setAssignedFilter('ALL');
@@ -59,7 +56,6 @@ export const TicketListView: React.FC<TicketListViewProps> = ({
   const hasActiveFilters =
     searchTerm !== '' ||
     statusFilter !== 'ALL' ||
-    priorityFilter !== 'ALL' ||
     categoryFilter !== 'ALL' ||
     branchFilter !== 'ALL' ||
     assignedFilter !== 'ALL';
@@ -73,7 +69,6 @@ export const TicketListView: React.FC<TicketListViewProps> = ({
       ticket.requesterName.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesStatus = statusFilter === 'ALL' || ticket.status === statusFilter;
-    const matchesPriority = priorityFilter === 'ALL' || ticket.priority === priorityFilter;
     const matchesCategory = categoryFilter === 'ALL' || ticket.category === categoryFilter;
     const matchesBranch = branchFilter === 'ALL' || ticket.branchId === branchFilter;
     const matchesAssigned =
@@ -84,7 +79,6 @@ export const TicketListView: React.FC<TicketListViewProps> = ({
     return (
       matchesSearch &&
       matchesStatus &&
-      matchesPriority &&
       matchesCategory &&
       matchesBranch &&
       matchesAssigned
@@ -93,7 +87,7 @@ export const TicketListView: React.FC<TicketListViewProps> = ({
 
   useEffect(() => {
     setPage(1);
-  }, [searchTerm, statusFilter, priorityFilter, categoryFilter, branchFilter, assignedFilter]);
+  }, [searchTerm, statusFilter, categoryFilter, branchFilter, assignedFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filteredTickets.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -113,9 +107,7 @@ export const TicketListView: React.FC<TicketListViewProps> = ({
       'Subject',
       'Description',
       'Category',
-      'Priority',
       'Status',
-      'SLA',
       'Branch',
       'Requester',
       'Assigned To',
@@ -127,9 +119,7 @@ export const TicketListView: React.FC<TicketListViewProps> = ({
       t.subject,
       t.description,
       t.category,
-      t.priority,
       t.status,
-      slaInfoFor(t).label,
       t.branchName,
       t.requesterName,
       t.assignedToName || 'Unassigned',
@@ -163,7 +153,7 @@ export const TicketListView: React.FC<TicketListViewProps> = ({
           {onNavigateNewRequest && (
             <button
               onClick={onNavigateNewRequest}
-              className="px-4 py-2 bg-blue-900 hover:bg-blue-800 text-white font-bold text-xs rounded-xl transition shadow-sm flex items-center gap-1.5 cursor-pointer"
+              className="px-4 py-2 bg-emerald-900 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl transition shadow-sm flex items-center gap-1.5 cursor-pointer"
             >
               <PlusCircle className="w-4 h-4" />
               <span>+ New IT Request</span>
@@ -192,7 +182,7 @@ export const TicketListView: React.FC<TicketListViewProps> = ({
               placeholder="Search by ticket #, subject, branch, or employee..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition"
+              className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:bg-white transition"
             />
           </div>
 
@@ -202,36 +192,21 @@ export const TicketListView: React.FC<TicketListViewProps> = ({
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-2.5 py-2 text-xs bg-slate-50 border border-slate-300 rounded-xl text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-600"
+              className="px-2.5 py-2 text-xs bg-slate-50 border border-slate-300 rounded-xl text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-emerald-600"
             >
               <option value="ALL">Status: All</option>
-              <option value="New">New</option>
               <option value="Assigned">Assigned</option>
               <option value="In Progress">In Progress</option>
               <option value="Pending">Pending</option>
               <option value="Resolved">Resolved</option>
               <option value="Closed">Closed</option>
-              <option value="Reopened">Reopened</option>
-            </select>
-
-            {/* Priority Filter */}
-            <select
-              value={priorityFilter}
-              onChange={(e) => setPriorityFilter(e.target.value)}
-              className="px-2.5 py-2 text-xs bg-slate-50 border border-slate-300 rounded-xl text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-600"
-            >
-              <option value="ALL">Priority: All</option>
-              <option value="Critical">Critical</option>
-              <option value="High">High</option>
-              <option value="Medium">Medium</option>
-              <option value="Low">Low</option>
             </select>
 
             {/* Category Filter */}
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="px-2.5 py-2 text-xs bg-slate-50 border border-slate-300 rounded-xl text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-600"
+              className="px-2.5 py-2 text-xs bg-slate-50 border border-slate-300 rounded-xl text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-emerald-600"
             >
               <option value="ALL">Category: All</option>
               {categoriesList.map((cat) => (
@@ -245,7 +220,7 @@ export const TicketListView: React.FC<TicketListViewProps> = ({
             <select
               value={branchFilter}
               onChange={(e) => setBranchFilter(e.target.value)}
-              className="px-2.5 py-2 text-xs bg-slate-50 border border-slate-300 rounded-xl text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-600"
+              className="px-2.5 py-2 text-xs bg-slate-50 border border-slate-300 rounded-xl text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-emerald-600"
             >
               <option value="ALL">Branch: All</option>
               {allBranches.map((b) => (
@@ -303,9 +278,7 @@ export const TicketListView: React.FC<TicketListViewProps> = ({
                   <th className="py-3.5 px-4">Branch</th>
                   <th className="py-3.5 px-4">Subject</th>
                   <th className="py-3.5 px-4">Category</th>
-                  <th className="py-3.5 px-4">Priority</th>
                   <th className="py-3.5 px-4">Status</th>
-                  <th className="py-3.5 px-4">SLA</th>
                   <th className="py-3.5 px-4">Assigned IT</th>
                   <th className="py-3.5 px-4">Submitted</th>
                   <th className="py-3.5 px-4 text-right">Action</th>
@@ -316,9 +289,9 @@ export const TicketListView: React.FC<TicketListViewProps> = ({
                   <tr
                     key={ticket.id}
                     onClick={() => onNavigateTicketDetail(ticket.id)}
-                    className="hover:bg-blue-50/40 transition cursor-pointer group"
+                    className="hover:bg-emerald-50/40 transition cursor-pointer group"
                   >
-                    <td className="py-3.5 px-4 font-mono font-bold text-blue-900 group-hover:underline">
+                    <td className="py-3.5 px-4 font-mono font-bold text-emerald-900 group-hover:underline">
                       #{ticket.id}
                     </td>
                     <td className="py-3.5 px-4 font-semibold text-slate-800 whitespace-nowrap">
@@ -329,13 +302,7 @@ export const TicketListView: React.FC<TicketListViewProps> = ({
                     </td>
                     <td className="py-3.5 px-4 text-slate-600">{ticket.category}</td>
                     <td className="py-3.5 px-4">
-                      <PriorityBadge priority={ticket.priority} size="sm" />
-                    </td>
-                    <td className="py-3.5 px-4">
                       <StatusBadge status={ticket.status} size="sm" />
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <SlaBadge ticket={ticket} size="sm" />
                     </td>
                     <td className="py-3.5 px-4 text-slate-700 whitespace-nowrap">
                       {ticket.assignedToName ? (
@@ -353,7 +320,7 @@ export const TicketListView: React.FC<TicketListViewProps> = ({
                           e.stopPropagation();
                           onNavigateTicketDetail(ticket.id);
                         }}
-                        className="px-2.5 py-1 rounded bg-slate-100 hover:bg-blue-900 hover:text-white text-slate-700 font-semibold transition inline-flex items-center gap-1 cursor-pointer"
+                        className="px-2.5 py-1 rounded bg-slate-100 hover:bg-emerald-900 hover:text-white text-slate-700 font-semibold transition inline-flex items-center gap-1 cursor-pointer"
                       >
                         <Eye className="w-3.5 h-3.5" />
                         <span>Manage</span>
@@ -386,7 +353,7 @@ export const TicketListView: React.FC<TicketListViewProps> = ({
               <ChevronLeft className="w-3.5 h-3.5" />
               <span>Prev</span>
             </button>
-            <span className="px-3 py-1.5 rounded-lg bg-blue-900 text-white font-bold text-xs">
+            <span className="px-3 py-1.5 rounded-lg bg-emerald-900 text-white font-bold text-xs">
               {currentPage} / {totalPages}
             </span>
             <button

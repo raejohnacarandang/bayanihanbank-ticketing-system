@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, Branch, CategoryInfo, AuditLog, Ticket, TicketStatus, UserRole, BranchAssignment } from '../types';
+import { User, Branch, CategoryInfo, AuditLog, Ticket, TicketStatus, UserRole, BranchAssignment, NotificationItem } from '../types';
 import type { CreateBranchParams, CreateUserParams, UpdateUserChanges } from '../services/store';
 import {
   Users,
@@ -18,15 +18,13 @@ import {
   AlertTriangle,
   MapPin,
   CalendarClock,
-  AlertCircle,
   PlayCircle,
   Clock,
   Archive,
-  RotateCcw,
-  Ban,
   BarChart3,
   Eye,
   EyeOff,
+  Monitor,
   type LucideIcon
 } from 'lucide-react';
 
@@ -38,6 +36,7 @@ interface AdminDashboardViewProps {
   categories: CategoryInfo[];
   auditLogs: AuditLog[];
   tickets: Ticket[];
+  notifications: NotificationItem[];
   activeTab: AdminTab;
   onSelectTab: (tab: AdminTab) => void;
   mode?: 'admin' | 'auditor';
@@ -65,7 +64,6 @@ interface UserFormState {
 
 interface BranchFormState {
   id?: string;
-  code: string;
   name: string;
   location: string;
   status: 'Active' | 'Inactive';
@@ -76,7 +74,7 @@ type DeleteTarget = { type: 'user'; id: string; name: string } | { type: 'branch
 
 const ROLE_OPTIONS: { value: UserRole; label: string }[] = [
   { value: 'BRANCH_USER', label: 'Branch User' },
-  { value: 'IT_STAFF', label: 'IT Staff' },
+  { value: 'IT_STAFF', label: 'IT Specialist' },
   { value: 'ADMINISTRATOR', label: 'Administrator' },
   { value: 'AUDITOR', label: 'Auditor (View-Only)' },
 ];
@@ -87,6 +85,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
   categories,
   auditLogs,
   tickets,
+  notifications,
   activeTab,
   mode = 'admin',
   onCreateUser,
@@ -111,22 +110,26 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
   const totalBranches = branches.length;
   const totalItStaff = users.filter((u) => u.role === 'IT_STAFF').length;
   const totalTickets = tickets.length;
-  const openTickets = tickets.filter((t) => t.status !== 'Closed' && t.status !== 'Cancelled').length;
+  const openTickets = tickets.filter((t) => t.status !== 'Closed').length;
   const resolvedTickets = tickets.filter((t) => t.status === 'Resolved' || t.status === 'Closed').length;
 
   const STATUS_DEFS: { status: TicketStatus; label: string; icon: LucideIcon; cardClass: string; barClass: string; countClass: string }[] = [
-    { status: 'New', label: 'New', icon: AlertCircle, cardClass: 'bg-blue-50 border-blue-200', barClass: 'bg-blue-600', countClass: 'text-blue-900' },
-    { status: 'Assigned', label: 'Assigned', icon: UserCheck, cardClass: 'bg-indigo-50 border-indigo-200', barClass: 'bg-indigo-600', countClass: 'text-indigo-900' },
     { status: 'In Progress', label: 'In Progress', icon: PlayCircle, cardClass: 'bg-amber-50 border-amber-200', barClass: 'bg-amber-500', countClass: 'text-amber-900' },
     { status: 'Pending', label: 'Pending', icon: Clock, cardClass: 'bg-purple-50 border-purple-200', barClass: 'bg-purple-600', countClass: 'text-purple-900' },
     { status: 'Resolved', label: 'Resolved', icon: CheckCircle2, cardClass: 'bg-emerald-50 border-emerald-200', barClass: 'bg-emerald-600', countClass: 'text-emerald-900' },
-    { status: 'Closed', label: 'Closed', icon: Archive, cardClass: 'bg-slate-100 border-slate-200', barClass: 'bg-slate-500', countClass: 'text-slate-700' },
-    { status: 'Reopened', label: 'Reopened', icon: RotateCcw, cardClass: 'bg-orange-50 border-orange-200', barClass: 'bg-orange-500', countClass: 'text-orange-900' },
-    { status: 'Cancelled', label: 'Cancelled', icon: Ban, cardClass: 'bg-red-50 border-red-200', barClass: 'bg-red-500', countClass: 'text-red-900' },
   ];
   const statusCount = (s: TicketStatus) => tickets.filter((t) => t.status === s).length;
 
   const itStaff = users.filter((u) => u.role === 'IT_STAFF');
+
+  const staffStatus = itStaff.map((s) => {
+    const staffTickets = tickets.filter((t) => t.assignedToId === s.id);
+    const pendingCount = staffTickets.filter((t) => t.status === 'Pending').length;
+    const inProgressCount = staffTickets.filter((t) => t.status === 'In Progress').length;
+    const resolvedCount = staffTickets.filter((t) => t.status === 'Resolved').length;
+    const newNotificationCount = notifications.filter((n) => n.userId === s.id && !n.read).length;
+    return { staff: s, pendingCount, inProgressCount, resolvedCount, newNotificationCount };
+  });
 
   const branchById = (id?: string): Branch | undefined => branches.find((b) => b.id === id);
 
@@ -160,7 +163,6 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
   const handleBranchFormSubmit = (form: BranchFormState) => {
     if (form.id) {
       onUpdateBranch?.(form.id, {
-        code: form.code,
         name: form.name,
         location: form.location,
         status: form.status,
@@ -168,7 +170,6 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
       });
     } else {
       onCreateBranch?.({
-        code: form.code,
         name: form.name,
         location: form.location,
         status: form.status,
@@ -204,10 +205,68 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
           <p className="text-xs text-slate-300 mt-1">
             {isAuditor
               ? 'Read-only monitoring of tickets and audit activity for the Internal Audit Department'
-              : 'Manage users, branches, IT staff, and review system audit activity'}
+              : 'Manage users, branches, IT specialist, and review system audit activity'}
           </p>
         </div>
       </div>
+
+      {/* IT Specialist Status (Overview only) */}
+      {activeTab === 'overview' && (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="p-4 sm:p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-slate-50/60">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <UserCheck className="w-4 h-4 text-sky-600" />
+                <span>IT Specialist Status</span>
+              </h3>
+              <p className="text-xs text-slate-500">Per-staff workload and new notification count</p>
+            </div>
+            <span className="text-xs text-slate-500 font-mono">{itStaff.length} IT specialist</span>
+          </div>
+          <div className="p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {staffStatus.map(({ staff: s, pendingCount, inProgressCount, resolvedCount, newNotificationCount }) => (
+              <div key={s.id} className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-9 h-9 rounded-full bg-amber-600 text-white font-bold flex items-center justify-center shrink-0 border border-amber-300/40">
+                    {s.name.charAt(0)}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-bold text-slate-900 text-sm truncate">{s.name}</div>
+                    <div className="text-[11px] text-slate-500 font-mono truncate">{s.username}</div>
+                  </div>
+                  {newNotificationCount > 0 && (
+                    <span className="min-w-6 h-6 px-1.5 rounded-full bg-emerald-600 text-white text-xs font-black flex items-center justify-center shrink-0">
+                      {newNotificationCount}
+                    </span>
+                  )}
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-center">
+                    <div className="text-[9px] font-bold text-amber-800 uppercase tracking-wider">In Progress</div>
+                    <div className="text-lg font-black text-amber-900">{inProgressCount}</div>
+                  </div>
+                  <div className="p-2.5 rounded-lg bg-purple-50 border border-purple-200 text-center">
+                    <div className="text-[9px] font-bold text-purple-800 uppercase tracking-wider">Pending</div>
+                    <div className="text-lg font-black text-purple-900">{pendingCount}</div>
+                  </div>
+                  <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-center">
+                    <div className="text-[9px] font-bold text-emerald-800 uppercase tracking-wider">Resolved</div>
+                    <div className="text-lg font-black text-emerald-900">{resolvedCount}</div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => window.open(`/wallboard/${s.id}`, '_blank', 'noopener')}
+                  className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-slate-900 hover:bg-sky-700 text-white text-[11px] font-bold transition cursor-pointer"
+                  title="Open this staff member's status on a dedicated monitor"
+                >
+                  <Monitor className="w-3.5 h-3.5" />
+                  <span>Monitor</span>
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Overview Stat Cards */}
       {activeTab === 'overview' && (
@@ -222,8 +281,8 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
               <div className="text-2xl font-black text-slate-900 mt-1">{totalBranches}</div>
             </div>
             <div className="bg-white p-4 rounded-xl border border-slate-200">
-              <span className="text-[10px] font-bold text-slate-500 uppercase">IT Staff</span>
-              <div className="text-2xl font-black text-blue-900 mt-1">{totalItStaff}</div>
+              <span className="text-[10px] font-bold text-slate-500 uppercase">IT Specialist</span>
+              <div className="text-2xl font-black text-emerald-900 mt-1">{totalItStaff}</div>
             </div>
             <div className="bg-white p-4 rounded-xl border border-slate-200">
               <span className="text-[10px] font-bold text-slate-500 uppercase">Total Tickets</span>
@@ -251,7 +310,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
               </div>
               <span className="text-xs text-slate-500 font-mono">{totalTickets} tickets total</span>
             </div>
-            <div className="p-4 sm:p-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            <div className="p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
               {STATUS_DEFS.map((s) => {
                 const count = statusCount(s.status);
                 const pct = totalTickets > 0 ? Math.round((count / totalTickets) * 100) : 0;
@@ -290,7 +349,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
               <span>Prototype Note on Administrator Section</span>
             </div>
             <p className="leading-relaxed text-amber-900/90">
-              This administrator interface is provided as a conceptual representation of future system administration features. User creation, Active Directory syncing, branch management, and SLA configuration will be wired to actual database tables in the backend development phase.
+              This administrator interface is provided as a conceptual representation of future system administration features. User creation, Active Directory syncing, and branch management will be wired to actual database tables in the backend development phase.
             </p>
           </div>
         </div>
@@ -339,9 +398,16 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
                   <td className="p-3 text-slate-700">{u.branchName || u.department || '—'}</td>
                   <td className="p-3 text-slate-500 font-mono">{u.email}</td>
                   <td className="p-3 text-right">
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                      Active
-                    </span>
+                    <div className="inline-flex flex-col items-end gap-1">
+                      {u.passwordResetRequested && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                          Reset requested
+                        </span>
+                      )}
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                        Active
+                      </span>
+                    </div>
                   </td>
                   {canManage && (
                     <td className="p-3 text-right whitespace-nowrap">
@@ -369,16 +435,16 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
         </div>
       )}
 
-      {/* IT Staff Settings Tab */}
+      {/* IT Specialist Settings Tab */}
       {activeTab === 'it_staff' && (
         <div className="space-y-4">
           <div className="bg-sky-50 border border-sky-200 rounded-xl p-4 text-xs text-sky-900 space-y-1">
             <div className="font-bold text-sky-950 flex items-center gap-1.5">
               <UserCheck className="w-4 h-4 text-sky-700" />
-              <span>IT Staff Settings</span>
+              <span>IT Specialist Settings</span>
             </div>
             <p className="leading-relaxed text-sky-900/80">
-              Manage Main IT Department staff accounts. IT staff receive notifications for every new ticket and
+              Manage Main IT Department staff accounts. IT specialist receive notifications for every new ticket and
               handle the service desk queue. New tickets are also visible to administrators.
             </p>
           </div>
@@ -387,14 +453,14 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
             <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
               <h3 className="font-bold text-slate-900 text-sm">Main IT Department Roster</h3>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-500">{itStaff.length} IT staff accounts</span>
+                <span className="text-xs text-slate-500">{itStaff.length} IT specialist accounts</span>
                 {canManage && (
                   <button
                     onClick={() => setUserModal({ mode: 'create', user: { role: 'IT_STAFF' } as User })}
                     className="px-3 py-1.5 bg-sky-700 hover:bg-sky-600 text-white font-bold text-[11px] rounded-lg transition flex items-center gap-1.5 cursor-pointer"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    <span>Add IT Staff</span>
+                    <span>Add IT Specialist</span>
                   </button>
                 )}
               </div>
@@ -403,7 +469,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 p-4">
               {itStaff.length === 0 && (
                 <div className="lg:col-span-2 p-8 text-center text-slate-400 text-xs">
-                  No IT staff accounts yet. Click "Add IT Staff" to create one.
+                  No IT specialist accounts yet. Click "Add IT Specialist" to create one.
                 </div>
               )}
               {itStaff.map((s) => (
@@ -436,14 +502,14 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
                         <button
                           onClick={() => setUserModal({ mode: 'edit', user: s })}
                           className="p-1.5 rounded bg-white hover:bg-sky-700 hover:text-white text-slate-600 border border-slate-200 transition cursor-pointer"
-                          title="Edit IT staff"
+                          title="Edit IT specialist"
                         >
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => setDeleteTarget({ type: 'user', id: s.id, name: s.name })}
                           className="p-1.5 rounded bg-white hover:bg-red-700 hover:text-white text-slate-600 border border-slate-200 transition cursor-pointer"
-                          title="Remove IT staff"
+                          title="Remove IT specialist"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -526,7 +592,6 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-100 text-slate-700 font-bold uppercase tracking-wider">
               <tr>
-                <th className="p-3">Branch Code</th>
                 <th className="p-3">Branch Name</th>
                 <th className="p-3">Location</th>
                 <th className="p-3">Staff Users</th>
@@ -537,7 +602,6 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
             <tbody className="divide-y divide-slate-100">
               {branches.map((b) => (
                 <tr key={b.id} className="hover:bg-slate-50">
-                  <td className="p-3 font-mono font-bold text-blue-900">{b.code}</td>
                   <td className="p-3 font-bold text-slate-900">{b.name}</td>
                   <td className="p-3 text-slate-600">{b.location}</td>
                   <td className="p-3 text-slate-700 font-medium">{b.userCount} users</td>
@@ -579,7 +643,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
           <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
             <h3 className="font-bold text-slate-900 text-sm">IT Request Categories Taxonomy</h3>
             <span className="text-xs text-amber-700 bg-amber-50 px-2 py-0.5 rounded font-semibold border border-amber-200">
-              Taxonomy & SLAs: TBD — For Confirmation
+              Taxonomy: TBD — For Confirmation
             </span>
           </div>
           <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -587,8 +651,8 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
               <div key={c.id} className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
                 <div className="flex items-center justify-between">
                   <h4 className="font-bold text-slate-900 text-sm">{c.name}</h4>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-100 text-blue-800">
-                    SLA Target: {c.slaTargetHours}
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">
+                    {c.status}
                   </span>
                 </div>
                 <p className="text-xs text-slate-600">{c.description}</p>
@@ -619,7 +683,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
                   <div className="font-bold text-slate-900 flex items-center gap-2">
                     <span>{log.action}</span>
                     {log.targetId && (
-                      <span className="font-mono text-[10px] bg-blue-100 text-blue-900 px-1.5 py-0.5 rounded font-bold">
+                      <span className="font-mono text-[10px] bg-emerald-100 text-emerald-900 px-1.5 py-0.5 rounded font-bold">
                         #{log.targetId}
                       </span>
                     )}
@@ -741,7 +805,7 @@ function UserFormModal({
     onSubmit(form);
   };
 
-  const inputClass = 'w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-600 focus:bg-white transition';
+  const inputClass = 'w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:bg-white transition';
   const labelClass = 'block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1';
 
   return (
@@ -756,6 +820,16 @@ function UserFormModal({
             <X className="w-4 h-4" />
           </button>
         </div>
+
+        {isEdit && initial?.passwordResetRequested && (
+          <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs">
+            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-amber-600" />
+            <span>
+              This user has <strong>requested a password reset</strong>. Set a new
+              password below so they can log in again — the badge clears once you save one.
+            </span>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
@@ -913,7 +987,6 @@ function BranchFormModal({
   const isEdit = mode === 'edit';
   const [form, setForm] = useState<BranchFormState>(() => ({
     id: initial?.id,
-    code: initial?.code || '',
     name: initial?.name || '',
     location: initial?.location || '',
     status: initial?.status || 'Active',
@@ -924,14 +997,14 @@ function BranchFormModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.code.trim() || !form.name.trim() || !form.location.trim()) {
+    if (!form.name.trim() || !form.location.trim()) {
       setError('Please fill in all required fields.');
       return;
     }
     onSubmit(form);
   };
 
-  const inputClass = 'w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:bg-white transition';
+  const inputClass = 'w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:bg-white transition';
   const labelClass = 'block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1';
 
   return (
@@ -949,19 +1022,7 @@ function BranchFormModal({
 
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelClass}>Branch Code <span className="text-red-500">*</span></label>
-              <input
-                type="text"
-                required
-                value={form.code}
-                onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
-                placeholder="e.g. UNQ-07"
-                className={inputClass}
-              />
-            </div>
-
-            <div>
+            <div className="col-span-2">
               <label className={labelClass}>Status</label>
               <select
                 value={form.status}
@@ -1109,7 +1170,7 @@ function StaffAssignmentModal({
         </div>
 
         <p className="text-xs text-slate-600 leading-relaxed">
-          Select which branch(es) this IT staff member is assigned to and set how long each assignment lasts.
+          Select which branch(es) this IT specialist member is assigned to and set how long each assignment lasts.
           Expired assignments appear in red on the roster.
         </p>
 
@@ -1128,12 +1189,12 @@ function StaffAssignmentModal({
                     type="checkbox"
                     checked={checked}
                     onChange={() => toggle(b.id)}
-                    className="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 cursor-pointer"
+                    className="w-4 h-4 rounded text-sky-600 focus:ring-emerald-500 cursor-pointer"
                   />
                   <div className="min-w-0">
                     <div className="font-bold text-slate-900 text-sm">{b.name}</div>
                     <div className="text-[11px] text-slate-500">
-                      {b.code} • {b.location}
+                      {b.location}
                     </div>
                   </div>
                 </div>
@@ -1144,7 +1205,7 @@ function StaffAssignmentModal({
                     <select
                       value={selections[b.id]}
                       onChange={(e) => setDuration(b.id, Number(e.target.value))}
-                      className="px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-lg text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer"
+                      className="px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-lg text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
                     >
                       {DURATION_OPTIONS.map((m) => (
                         <option key={m} value={m}>

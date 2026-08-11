@@ -31,6 +31,10 @@ server {
     ssl_certificate_key /etc/letsencrypt/live/servicedesk.bayanihanbank.ph/privkey.pem;
     ssl_protocols       TLSv1.2 TLSv1.3;
 
+    # Force HTTPS for a year (trust proxy on the app trusts loopback, so real
+    # client IPs reach the login rate limiter).
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
     # 200 MB upload limit for ticket attachments
     client_max_body_size 200m;
 

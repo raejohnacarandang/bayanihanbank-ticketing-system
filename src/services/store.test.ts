@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { Ticket, User } from '../types';
+import { User } from '../types';
 import {
   addComment,
   assignTicket,
@@ -7,9 +7,7 @@ import {
   createTicket,
   markNotificationAsRead,
   setCurrentUser,
-  slaHoursFor,
-  slaStatusFor,
-  updateTicketPriority,
+  updateStaffAssignments,
   updateTicketStatus
 } from './store';
 
@@ -25,9 +23,9 @@ describe('createState', () => {
 });
 
 describe('createTicket', () => {
-  it('creates a ticket with the next sequential id and auto-assigns to the IT staff covering the branch', () => {
+  it('creates a ticket with the next sequential id and auto-assigns to the IT specialist covering the branch', () => {
     let state = createState();
-    const ticket = { subject: 'Test', description: 'Desc', category: 'Hardware' as const, priority: 'Low' as const };
+    const ticket = { subject: 'Test', description: 'Desc', category: 'Hardware' as const };
     state = createTicket(state, { ...ticket, currentUser: branchUser() });
     const created = state.tickets[0];
     expect(created.id).toBe('IT-000126');
@@ -37,14 +35,13 @@ describe('createTicket', () => {
     expect(state.ticketCounter).toBe(127);
   });
 
-  it('auto-assigns to the IT staff assigned to the requester branch', () => {
+  it('auto-assigns to the IT specialist assigned to the requester branch', () => {
     const state = createState();
     const requester = state.users.find((u) => u.id === 'usr-002')!; // Atimonan Branch
     const next = createTicket(state, {
       subject: 'Test',
       description: 'Desc',
       category: 'Network' as const,
-      priority: 'High' as const,
       currentUser: requester,
     });
     const created = next.tickets[0];
@@ -53,27 +50,25 @@ describe('createTicket', () => {
     expect(created.assignedToId).toBe('usr-003');
   });
 
-  it('leaves the ticket New when no IT staff covers the branch', () => {
+  it('leaves the ticket Pending when no IT specialist covers the branch', () => {
     const state = createState();
     const requester = { ...state.users[0], branchId: 'br-999', branchName: 'Unknown Branch' };
     const next = createTicket(state, {
       subject: 'Test',
       description: 'Desc',
       category: 'Hardware' as const,
-      priority: 'Low' as const,
       currentUser: requester,
     });
-    expect(next.tickets[0].status).toBe('New');
+    expect(next.tickets[0].status).toBe('Pending');
     expect(next.tickets[0].assignedToId).toBeUndefined();
   });
 
-  it('notifies every IT staff member and administrator, not just one', () => {
+  it('notifies every IT specialist member and administrator, not just one', () => {
     const state = createState();
     const next = createTicket(state, {
       subject: 'Test',
       description: 'Desc',
       category: 'Network' as const,
-      priority: 'High' as const,
       currentUser: branchUser(),
     });
     const supportUsers = next.users.filter((u) => u.role === 'IT_STAFF' || u.role === 'ADMINISTRATOR');
@@ -88,7 +83,7 @@ describe('createTicket', () => {
 });
 
 describe('updateTicketStatus', () => {
-  it('notifies the requester when IT staff change the status', () => {
+  it('notifies the requester when IT specialist change the status', () => {
     const state = createState();
     const requesterId = state.tickets.find((t) => t.id === 'IT-000122')!.requesterId;
     const next = updateTicketStatus(state, 'IT-000122', 'In Progress', itStaff());
@@ -96,18 +91,18 @@ describe('updateTicketStatus', () => {
     expect(next.notifications.some((n) => n.ticketId === 'IT-000122' && n.userId === requesterId)).toBe(true);
   });
 
-  it('notifies the assigned IT staff when a branch user updates a ticket', () => {
+  it('notifies the assigned IT specialist when a branch user updates a ticket', () => {
     const state = createState();
     const ticket = state.tickets.find((t) => t.id === 'IT-000122')!;
     expect(ticket.assignedToId).toBeDefined();
-    const next = updateTicketStatus(state, 'IT-000122', 'Reopened', branchUser());
+    const next = updateTicketStatus(state, 'IT-000122', 'Pending', branchUser());
     const relevant = next.notifications.filter((n) => n.ticketId === 'IT-000122');
     expect(relevant.some((n) => n.userId === ticket.assignedToId)).toBe(true);
   });
 });
 
 describe('assignTicket', () => {
-  it('assigns the staff member and moves New tickets to Assigned', () => {
+  it('assigns the staff member and moves Pending tickets to Assigned', () => {
     const state = createState();
     const staff = itStaff();
     const next = assignTicket(state, 'IT-000123', staff, branchUser());
@@ -117,11 +112,42 @@ describe('assignTicket', () => {
   });
 });
 
-describe('updateTicketPriority', () => {
-  it('updates the priority on the ticket', () => {
-    const state = createState();
-    const next = updateTicketPriority(state, 'IT-000121', 'Critical', itStaff());
-    expect(next.tickets.find((t) => t.id === 'IT-000121')!.priority).toBe('Critical');
+describe('updateStaffAssignments', () => {
+  it('auto-assigns existing unassigned tickets when a branch gets an IT specialist', () => {
+    let state = createState();
+    const staff = itStaff();
+    const requester = { ...state.users[0], branchId: 'br-999', branchName: 'Unknown Branch' };
+    state = createTicket(state, {
+      subject: 'Uncovered',
+      description: 'No IT specialist yet',
+      category: 'Network' as const,
+      currentUser: requester,
+    });
+    const pending = state.tickets[0];
+    expect(pending.status).toBe('Pending');
+    expect(pending.assignedToId).toBeUndefined();
+
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 6 * 30 * 24 * 60 * 60 * 1000);
+    const next = updateStaffAssignments(
+      state,
+      staff.id,
+      [
+        {
+          branchId: 'br-999',
+          branchName: 'Unknown Branch',
+          durationMonths: 6,
+          assignedAt: now.toISOString(),
+          expiresAt: expiresAt.toISOString(),
+        },
+      ],
+      branchUser()
+    );
+
+    const assigned = next.tickets.find((t) => t.id === pending.id)!;
+    expect(assigned.status).toBe('Assigned');
+    expect(assigned.assignedToId).toBe(staff.id);
+    expect(assigned.assignedToName).toBe(staff.name);
   });
 });
 
@@ -158,37 +184,5 @@ describe('setCurrentUser', () => {
     const state = createState();
     const admin = state.users.find((u) => u.role === 'ADMINISTRATOR')!;
     expect(setCurrentUser(state, admin).currentUser.id).toBe(admin.id);
-  });
-});
-
-describe('SLA tracking', () => {
-  const ticket = (overrides: Partial<Ticket>): Ticket => ({
-    id: 'IT-999999',
-    subject: 'SLA test',
-    description: 'x',
-    category: 'Network',
-    priority: 'High',
-    status: 'In Progress',
-    requesterId: 'usr-001',
-    requesterName: 'Juan',
-    branchId: 'br-001',
-    branchName: 'Unisan',
-    createdAt: '2026-08-09 08:00 AM',
-    createdAtISO: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-    updatedAt: '2026-08-09 08:00 AM',
-    ...overrides,
-  });
-
-  it('maps SLA hours per category', () => {
-    expect(slaHoursFor('Network')).toBe(4);
-    expect(slaHoursFor('IT Equipment')).toBe(72);
-  });
-
-  it('flags tickets past the deadline as breached', () => {
-    expect(slaStatusFor(ticket({}))).toBe('breached'); // Network SLA = 4h, ticket is 5h old
-  });
-
-  it('ignores closed tickets', () => {
-    expect(slaStatusFor(ticket({ status: 'Closed' }))).toBe('na');
   });
 });

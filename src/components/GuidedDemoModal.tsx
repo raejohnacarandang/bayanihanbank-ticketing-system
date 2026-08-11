@@ -29,7 +29,7 @@ export const GuidedDemoModal: React.FC<GuidedDemoModalProps> = ({
     {
       num: 2,
       title: 'Submit IT Request',
-      description: 'Click "+ New IT Request", select Hardware, Medium priority, and subject "Printer is not working".',
+      description: 'Click "+ New IT Request", select Hardware, and enter subject "Printer is not working".',
       roleNeeded: 'BRANCH_USER' as UserRole,
       actionText: 'Go to New IT Request Form',
       actionView: 'new_request',
@@ -45,9 +45,9 @@ export const GuidedDemoModal: React.FC<GuidedDemoModalProps> = ({
     {
       num: 4,
       title: 'Switch to IT Department',
-      description: 'Switch role to IT Staff (Mark Reyes - Main IT) to view incoming tickets.',
+      description: 'Switch role to IT Specialist (Mark Reyes - Main IT) to view incoming tickets.',
       roleNeeded: 'IT_STAFF' as UserRole,
-      actionText: 'Switch to IT Staff (Mark Reyes)',
+      actionText: 'Switch to IT Specialist (Mark Reyes)',
       actionView: 'dashboard',
     },
     {
@@ -88,19 +88,19 @@ export const GuidedDemoModal: React.FC<GuidedDemoModalProps> = ({
     <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
       <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col border border-slate-200 overflow-hidden">
         {/* Header */}
-        <div className="bg-blue-950 text-white px-6 py-4 flex items-center justify-between border-b border-blue-900">
+        <div className="bg-emerald-950 text-white px-6 py-4 flex items-center justify-between border-b border-emerald-800">
           <div className="flex items-center gap-2">
-            <Play className="w-5 h-5 text-blue-400 fill-blue-400" />
+            <Play className="w-5 h-5 text-emerald-400 fill-emerald-400" />
             <div>
               <h2 className="text-lg font-bold">Interactive Demo Walkthrough Guide</h2>
-              <p className="text-xs text-blue-200">
+              <p className="text-xs text-emerald-200">
                 End-to-End IT Service Desk Ticket Lifecycle Simulation
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-blue-900 transition"
+            className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-emerald-900 transition"
           >
             <X className="w-5 h-5" />
           </button>
@@ -108,7 +108,7 @@ export const GuidedDemoModal: React.FC<GuidedDemoModalProps> = ({
 
         {/* Body */}
         <div className="p-6 overflow-y-auto space-y-4">
-          <p className="text-xs text-slate-600 bg-blue-50 border border-blue-200 p-3 rounded-lg leading-relaxed">
+          <p className="text-xs text-slate-600 bg-emerald-50 border border-emerald-200 p-3 rounded-lg leading-relaxed">
             This guided walkthrough demonstrates the complete <strong>Branch User → Main IT → Resolution → Branch Confirmation</strong> workflow required for presentation to the IT supervisor.
           </p>
 
@@ -116,10 +116,10 @@ export const GuidedDemoModal: React.FC<GuidedDemoModalProps> = ({
             {steps.map((step) => (
               <div
                 key={step.num}
-                className="p-3.5 bg-slate-50 rounded-lg border border-slate-200 hover:border-blue-300 transition flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
+                className="p-3.5 bg-slate-50 rounded-lg border border-slate-200 hover:border-emerald-300 transition flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
               >
                 <div className="flex items-start gap-3">
-                  <span className="w-7 h-7 rounded-full bg-blue-900 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                  <span className="w-7 h-7 rounded-full bg-emerald-900 text-white font-bold text-xs flex items-center justify-center shrink-0">
                     {step.num}
                   </span>
                   <div>
@@ -139,7 +139,7 @@ export const GuidedDemoModal: React.FC<GuidedDemoModalProps> = ({
                     onNavigateView(step.actionView);
                     onClose();
                   }}
-                  className="shrink-0 px-3 py-1.5 bg-blue-900 hover:bg-blue-800 text-white text-xs font-medium rounded-md transition flex items-center gap-1 self-end sm:self-center"
+                  className="shrink-0 px-3 py-1.5 bg-emerald-900 hover:bg-emerald-800 text-white text-xs font-medium rounded-md transition flex items-center gap-1 self-end sm:self-center"
                 >
                   <span>{step.actionText}</span>
                   <ArrowRight className="w-3.5 h-3.5" />

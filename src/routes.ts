@@ -14,7 +14,7 @@ const ADMIN_TAB_PATH: Record<Exclude<AdminTab, 'overview'>, string> = {
   activity_logs: '/admin/activity-logs',
 };
 
-export function pathForView(view: ActiveView, adminTab?: AdminTab, ticketId?: string): string {
+export function pathForView(view: ActiveView, adminTab?: AdminTab, ticketId?: string, staffId?: string): string {
   switch (view) {
     case 'dashboard':
       return '/';
@@ -50,6 +50,8 @@ export function pathForView(view: ActiveView, adminTab?: AdminTab, ticketId?: st
       return '/profile';
     case 'requirements':
       return '/requirements';
+    case 'wallboard':
+      return staffId ? `/wallboard/${encodeURIComponent(staffId)}` : '/wallboard';
     default:
       return '/';
   }
@@ -59,6 +61,7 @@ export interface ParsedPath {
   view: ActiveView;
   adminTab?: AdminTab;
   ticketId?: string;
+  staffId?: string;
 }
 
 export function parsePath(pathname: string): ParsedPath | null {
@@ -77,6 +80,10 @@ export function parsePath(pathname: string): ParsedPath | null {
       return { view: 'profile' };
     case 'requirements':
       return { view: 'requirements' };
+    case 'wallboard':
+      return parts.length > 1
+        ? { view: 'wallboard', staffId: decodeURIComponent(parts[1]) }
+        : { view: 'wallboard' };
     case 'tickets': {
       if (parts.length === 1) return { view: 'all_tickets' };
       switch (parts[1]) {

@@ -44,10 +44,10 @@ export const RequirementStatusModal: React.FC<RequirementStatusModalProps> = ({
             </h3>
             <ul className="list-disc pl-5 space-y-1 text-slate-700">
               <li>
-                <strong>End-to-End Workflow:</strong> Branch Request Submission → Unique Ticket Number Generation → IT Queue Review → IT Staff Assignment → Status Updates → IT Resolution Recording → Branch Confirmation → Closure.
+                <strong>End-to-End Workflow:</strong> Branch Request Submission → Unique Ticket Number Generation → IT Queue Review → IT Specialist Assignment → Status Updates → IT Resolution Recording → Branch Confirmation → Closure.
               </li>
               <li>
-                <strong>Role-Based User Interfaces:</strong> Distinct dashboards for <em>Branch Users</em>, <em>Main IT Staff</em>, and <em>Administrators</em>.
+                <strong>Role-Based User Interfaces:</strong> Distinct dashboards for <em>Branch Users</em>, <em>Main IT Specialist</em>, and <em>Administrators</em>.
               </li>
               <li>
                 <strong>Ticket Interaction:</strong> Public comments thread, <em>Internal IT Notes</em> (hidden from branch users), and timestamped activity timeline.
@@ -56,7 +56,7 @@ export const RequirementStatusModal: React.FC<RequirementStatusModalProps> = ({
                 <strong>Branch Confirmation Step:</strong> Interactive prompt for branch users to click <em>Confirm Resolution</em> (closes ticket) or <em>Issue Still Exists</em> (reopens ticket).
               </li>
               <li>
-                <strong>Filterable Ticket Queue:</strong> Search by ticket number, branch, subject, status, priority, and category.
+                <strong>Filterable Ticket Queue:</strong> Search by ticket number, branch, subject, status, and category.
               </li>
             </ul>
           </div>
@@ -85,14 +85,6 @@ export const RequirementStatusModal: React.FC<RequirementStatusModalProps> = ({
                 </span>
                 <span className="text-xs text-slate-600">
                   TBD — For Confirmation (Current categories: Hardware, Software, Network, Access, Equipment, Installation)
-                </span>
-              </div>
-              <div className="bg-white p-3 rounded border border-amber-200 shadow-2xs">
-                <span className="font-semibold text-slate-900 block text-xs uppercase tracking-wide text-amber-700">
-                  SLA Target Resolution Times
-                </span>
-                <span className="text-xs text-slate-600">
-                  TBD — For Confirmation (e.g., Critical: 4hrs, High: 12hrs, Medium: 24hrs)
                 </span>
               </div>
               <div className="bg-white p-3 rounded border border-amber-200 shadow-2xs">

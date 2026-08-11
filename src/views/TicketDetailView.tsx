@@ -4,10 +4,9 @@ import {
   User,
   Comment as CommentType,
   TimelineEvent,
-  TicketStatus,
-  TicketPriority
+  TicketStatus
 } from '../types';
-import { StatusBadge, PriorityBadge, SlaBadge } from '../components/Badge';
+import { StatusBadge } from '../components/Badge';
 import {
   ArrowLeft,
   CheckCircle2,
@@ -21,7 +20,6 @@ import {
   History,
   FileText,
   AlertTriangle,
-  RotateCcw,
   ShieldCheck,
   Paperclip,
   Check
@@ -32,11 +30,8 @@ interface TicketDetailViewProps {
   comments: CommentType[];
   timeline: TimelineEvent[];
   currentUser: User;
-  allStaff: User[];
   onNavigateBack: () => void;
   onUpdateStatus: (ticketId: string, status: TicketStatus, notes?: string) => void;
-  onAssignStaff: (ticketId: string, staffUser: User) => void;
-  onUpdatePriority: (ticketId: string, priority: TicketPriority) => void;
   onAddComment: (ticketId: string, content: string, isInternal: boolean) => void;
 }
 
@@ -45,11 +40,8 @@ export const TicketDetailView: React.FC<TicketDetailViewProps> = ({
   comments,
   timeline,
   currentUser,
-  allStaff,
   onNavigateBack,
   onUpdateStatus,
-  onAssignStaff,
-  onUpdatePriority,
   onAddComment,
 }) => {
   const [commentText, setCommentText] = useState('');
@@ -100,8 +92,6 @@ export const TicketDetailView: React.FC<TicketDetailViewProps> = ({
             Ticket ID: <strong className="text-slate-900 font-bold">#{ticket.id}</strong>
           </span>
           <StatusBadge status={ticket.status} size="sm" />
-          <PriorityBadge priority={ticket.priority} size="sm" />
-          <SlaBadge ticket={ticket} size="sm" />
         </div>
       </div>
 
@@ -113,7 +103,7 @@ export const TicketDetailView: React.FC<TicketDetailViewProps> = ({
             <div>
               <h3 className="text-lg font-bold">Ticket Resolved by Main IT</h3>
               <p className="text-xs text-emerald-100 mt-1 leading-relaxed">
-                IT Staff has recorded resolution: &quot;
+                IT Specialist has recorded resolution: &quot;
                 <strong className="text-white italic">{ticket.resolutionNotes || 'Request handled.'}</strong>
                 &quot;. Please confirm whether the issue has been resolved at your branch.
               </p>
@@ -129,14 +119,6 @@ export const TicketDetailView: React.FC<TicketDetailViewProps> = ({
                 >
                   <Check className="w-4 h-4" />
                   <span>Confirm Resolution (Close Ticket)</span>
-                </button>
-
-                <button
-                  onClick={() => onUpdateStatus(ticket.id, 'Reopened', 'Branch reported issue still exists.')}
-                  className="px-5 py-2.5 bg-rose-950/80 hover:bg-rose-900 text-rose-200 font-bold text-xs rounded-xl transition border border-rose-800 flex items-center gap-1.5 cursor-pointer"
-                >
-                  <RotateCcw className="w-4 h-4" />
-                  <span>Issue Still Exists (Reopen Ticket)</span>
                 </button>
               </>
             )}
@@ -154,7 +136,7 @@ export const TicketDetailView: React.FC<TicketDetailViewProps> = ({
         <div className="p-6 border-b border-slate-200 bg-slate-900 text-white space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <span className="font-mono text-xs font-bold text-blue-300 bg-blue-950 px-2 py-0.5 rounded border border-blue-800">
+              <span className="font-mono text-xs font-bold text-emerald-300 bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800">
                 #{ticket.id}
               </span>
               <span className="text-xs font-semibold text-slate-300">{ticket.category}</span>
@@ -174,7 +156,7 @@ export const TicketDetailView: React.FC<TicketDetailViewProps> = ({
               Requesting Branch
             </span>
             <span className="font-bold text-slate-900 mt-0.5 block flex items-center gap-1">
-              <Building className="w-3.5 h-3.5 text-blue-600" />
+              <Building className="w-3.5 h-3.5 text-emerald-600" />
               {ticket.branchName}
             </span>
           </div>
@@ -190,12 +172,12 @@ export const TicketDetailView: React.FC<TicketDetailViewProps> = ({
 
           <div>
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-              Assigned IT Staff
+              Assigned IT Specialist
             </span>
             <span className="font-semibold text-slate-800 mt-0.5 block">
               {ticket.assignedToName ? (
-                <span className="text-blue-900 font-bold flex items-center gap-1">
-                  <UserCheck className="w-3.5 h-3.5 text-blue-600" />
+                <span className="text-emerald-900 font-bold flex items-center gap-1">
+                  <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
                   {ticket.assignedToName}
                 </span>
               ) : (
@@ -234,9 +216,9 @@ export const TicketDetailView: React.FC<TicketDetailViewProps> = ({
                 {ticket.attachments.map((att) => (
                   <div
                     key={att.id}
-                    className="p-2.5 bg-blue-50/80 border border-blue-200 rounded-lg text-xs font-medium text-blue-900 flex items-center gap-2"
+                    className="p-2.5 bg-emerald-50/80 border border-emerald-200 rounded-lg text-xs font-medium text-emerald-900 flex items-center gap-2"
                   >
-                    <Paperclip className="w-4 h-4 text-blue-600" />
+                    <Paperclip className="w-4 h-4 text-emerald-600" />
                     <span>{att.filename}</span>
                     <span className="text-[10px] text-slate-400">({att.filesize})</span>
                   </div>
@@ -267,32 +249,10 @@ export const TicketDetailView: React.FC<TicketDetailViewProps> = ({
               <ShieldCheck className="w-4 h-4" />
               IT Management Toolbar (Main IT Department)
             </h3>
-            <span className="text-[10px] text-slate-400 font-mono">IT Staff Controls</span>
+            <span className="text-[10px] text-slate-400 font-mono">IT Specialist Controls</span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {/* Assign IT Staff */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                Assign Ticket To:
-              </label>
-              <select
-                value={ticket.assignedToId || ''}
-                onChange={(e) => {
-                  const staff = allStaff.find((s) => s.id === e.target.value);
-                  if (staff) onAssignStaff(ticket.id, staff);
-                }}
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs font-medium text-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-              >
-                <option value="">-- Select IT Staff --</option>
-                {allStaff.map((staff) => (
-                  <option key={staff.id} value={staff.id}>
-                    {staff.name} ({staff.department || 'Main IT'})
-                  </option>
-                ))}
-              </select>
-            </div>
-
             {/* Change Status */}
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1.5">
@@ -308,33 +268,13 @@ export const TicketDetailView: React.FC<TicketDetailViewProps> = ({
                     onUpdateStatus(ticket.id, val);
                   }
                 }}
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs font-medium text-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs font-medium text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
               >
-                <option value="New">New</option>
                 <option value="Assigned">Assigned</option>
                 <option value="In Progress">In Progress</option>
                 <option value="Pending">Pending</option>
                 <option value="Resolved">Resolved</option>
                 <option value="Closed">Closed</option>
-                <option value="Reopened">Reopened</option>
-                <option value="Cancelled">Cancelled</option>
-              </select>
-            </div>
-
-            {/* Change Priority */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                Review Priority:
-              </label>
-              <select
-                value={ticket.priority}
-                onChange={(e) => onUpdatePriority(ticket.id, e.target.value as TicketPriority)}
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs font-medium text-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-              >
-                <option value="Low">Low</option>
-                <option value="Medium">Medium</option>
-                <option value="High">High</option>
-                <option value="Critical">Critical</option>
               </select>
             </div>
           </div>
@@ -348,7 +288,7 @@ export const TicketDetailView: React.FC<TicketDetailViewProps> = ({
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-6">
             <div className="flex items-center justify-between border-b border-slate-200 pb-3">
               <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <MessageSquare className="w-4 h-4 text-blue-600" />
+                <MessageSquare className="w-4 h-4 text-emerald-600" />
                 <span>Conversation & Progress Notes</span>
               </h3>
               <span className="text-xs font-semibold text-slate-500">
@@ -415,7 +355,7 @@ export const TicketDetailView: React.FC<TicketDetailViewProps> = ({
                   value={commentText}
                   onChange={(e) => setCommentText(e.target.value)}
                   placeholder="Type your message or response..."
-                  className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition"
+                  className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:bg-white transition"
                 />
 
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -432,13 +372,13 @@ export const TicketDetailView: React.FC<TicketDetailViewProps> = ({
                     </label>
                   ) : (
                     <span className="text-[11px] text-slate-400 italic">
-                      Comments are visible to Main IT Staff.
+                      Comments are visible to Main IT Specialist.
                     </span>
                   )}
 
                   <button
                     type="submit"
-                    className="px-5 py-2 bg-blue-900 hover:bg-blue-800 text-white font-bold text-xs rounded-xl transition shadow-sm flex items-center gap-1.5 ml-auto cursor-pointer"
+                    className="px-5 py-2 bg-emerald-900 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl transition shadow-sm flex items-center gap-1.5 ml-auto cursor-pointer"
                   >
                     <Send className="w-3.5 h-3.5" />
                     <span>Post Comment</span>
@@ -464,7 +404,7 @@ export const TicketDetailView: React.FC<TicketDetailViewProps> = ({
               {timeline.map((event) => (
                 <div key={event.id} className="relative text-xs">
                   {/* Timeline Dot Indicator */}
-                  <div className="absolute -left-6 top-0.5 w-3 h-3 rounded-full bg-blue-600 border-2 border-white shadow-xs" />
+                  <div className="absolute -left-6 top-0.5 w-3 h-3 rounded-full bg-emerald-600 border-2 border-white shadow-xs" />
 
                   <div className="font-bold text-slate-900">{event.action}</div>
                   <div className="text-[10px] text-slate-500">

@@ -15,14 +15,19 @@ import express, { Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { randomBytes, timingSafeEqual } from 'crypto';
 import dotenv from 'dotenv';
+import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
+import { createServer } from 'http';
+import { initWebSocketServer, broadcastUpdate as wsBroadcastUpdate } from './src/server/websocket';
+import { csrfCookie, csrfProtection } from './src/server/csrf';
 import {
   AppState,
   Branch,
   BranchAssignment,
   Comment,
   Ticket,
-  TicketPriority,
   TicketStatus,
   User
 } from './src/types';
@@ -39,9 +44,10 @@ import {
   setCurrentUser,
   updateBranch,
   updateStaffAssignments,
-  updateTicketPriority,
   updateTicketStatus,
-  updateUser
+  updateUser,
+  requestPasswordReset,
+  performAdminRecovery
 } from './src/services/store';
 import type {
   CreateBranchParams,
@@ -65,6 +71,23 @@ import {
   verifyPassword,
   verifyToken
 } from './src/server/auth';
+import {
+  loginSchema,
+  resetRequestSchema,
+  adminRecoverySchema,
+  changePasswordSchema,
+  createTicketSchema,
+  updateTicketStatusSchema,
+  assignTicketSchema,
+  addCommentSchema,
+  createUserSchema,
+  updateUserSchema,
+  updateAssignmentsSchema,
+  createBranchSchema,
+  updateBranchSchema,
+  validate
+} from './src/server/validation';
+import { setupSwagger } from './src/server/swagger';
 
 dotenv.config();
 
@@ -74,15 +97,57 @@ const PORT = Number(process.env.PORT || 3001);
 let state: AppState;
 
 const app = express();
+app.set('trust proxy', 'loopback');
 app.use(express.json());
+app.use(cookieParser());
+
+// Create HTTP server for WebSocket support
+const httpServer = createServer(app);
+
+// CSRF protection - set cookie on safe methods
+app.use(csrfCookie);
+
+// Security headers via Helmet
+app.use(helmet({
+  contentSecurityPolicy: false, // Disable CSP for development flexibility
+  crossOriginEmbedderPolicy: false,
+  hsts: process.env.NODE_ENV === 'production', // Enable HSTS in production
+}));
+
+// API Documentation (Swagger UI)
+setupSwagger(app);
+
+// Initialize WebSocket server for real-time updates
+initWebSocketServer(httpServer);
+
+// Login rate limiting (in-memory, per client IP — no external dependencies).
+const loginAttempts = new Map<string, { count: number; resetAt: number }>();
+const LOGIN_MAX_ATTEMPTS = 5;
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+
+function isLoginLocked(ip: string): boolean {
+  const entry = loginAttempts.get(ip);
+  return Boolean(entry) && entry!.count >= LOGIN_MAX_ATTEMPTS && Date.now() < entry!.resetAt;
+}
+
+function recordFailedLogin(ip: string): void {
+  const now = Date.now();
+  const entry = loginAttempts.get(ip);
+  if (!entry || now >= entry.resetAt) {
+    loginAttempts.set(ip, { count: 1, resetAt: now + LOGIN_WINDOW_MS });
+  } else {
+    entry.count += 1;
+  }
+}
 
 // ---------------------------------------------------------------------------
-// Real-time broadcast (Server-Sent Events)
+// Real-time broadcast (Server-Sent Events + WebSocket)
 // ---------------------------------------------------------------------------
 
 const sseClients = new Set<Response>();
 
 function broadcastUpdate(): void {
+  // SSE broadcast
   const payload = `data: ${JSON.stringify({ type: 'update', at: Date.now() })}\n\n`;
   for (const res of sseClients) {
     try {
@@ -91,6 +156,9 @@ function broadcastUpdate(): void {
       sseClients.delete(res);
     }
   }
+  
+  // WebSocket broadcast
+  wsBroadcastUpdate('update', { at: Date.now() });
 }
 
 // ---------------------------------------------------------------------------
@@ -136,7 +204,6 @@ function ticketListForViewer(state: AppState, viewer: User, filters: Record<stri
   if (filters.assignedToId) tickets = tickets.filter((t) => t.assignedToId === filters.assignedToId);
   if (filters.requesterId) tickets = tickets.filter((t) => t.requesterId === filters.requesterId);
   if (filters.category) tickets = tickets.filter((t) => t.category === filters.category);
-  if (filters.priority) tickets = tickets.filter((t) => t.priority === filters.priority);
   return tickets;
 }
 
@@ -146,15 +213,22 @@ const DEMO_USERNAMES = ['branch.user', 'maria.santos', 'it.staff', 'ana.cruz', '
 // Auth
 // ---------------------------------------------------------------------------
 
-app.post('/api/auth/login', async (req: Request, res: Response) => {
+app.post('/api/auth/login', validate(loginSchema), async (req: Request, res: Response) => {
+  const ip = req.ip || 'unknown';
+  if (isLoginLocked(ip)) {
+    res.setHeader('Retry-After', '900');
+    return res.status(429).json({ error: 'Too many login attempts. Try again in 15 minutes.' });
+  }
   const { username, password } = req.body as { username?: string; password?: string };
   if (!username || !password) {
     return res.status(400).json({ error: 'username and password are required' });
   }
   const user = state.users.find((u) => u.username.toLowerCase() === username.trim().toLowerCase());
   if (!user || !verifyPassword(password, user.passwordHash)) {
+    recordFailedLogin(ip);
     return res.status(401).json({ error: 'Invalid username or password' });
   }
+  loginAttempts.delete(ip);
   const before = state;
   const after = setCurrentUser(state, user);
   const token = signToken(user);
@@ -168,6 +242,85 @@ app.get('/api/auth/demo-accounts', (_req: Request, res: Response) => {
       ? []
       : state.users.filter((u) => DEMO_USERNAMES.includes(u.username)).map(publicUser);
   res.json({ users });
+});
+
+// Public: self-service password reset request (no session required). Marks the
+// account and notifies all administrators, who can then set a new password.
+// Administrator accounts short-circuit to the recovery-key flow instead.
+app.post('/api/auth/reset-request', validate(resetRequestSchema), async (req: Request, res: Response) => {
+  const { username } = req.body as { username?: string };
+  if (!username || !username.trim()) {
+    return res.status(400).json({ error: 'Username is required' });
+  }
+  const before = state;
+  const { state: after, user, requiresRecoveryKey } = requestPasswordReset(state, username);
+  if (!user) {
+    return res.status(404).json({ error: 'No account found with that username' });
+  }
+  if (requiresRecoveryKey) {
+    return res.status(200).json({
+      ok: true,
+      requiresRecoveryKey: true,
+      message: 'This is an administrator account. Enter the recovery key to reset it.',
+    });
+  }
+  await commit(res, before, after, {
+    ok: true,
+    message: 'Reset request submitted. Your administrator will contact you.',
+  });
+});
+
+// Public: recovery-key password reset for administrator accounts (no session
+// required). Validates a static operator key from the environment, rotates the
+// admin's password to a fresh one-time password, and returns it ONCE. Also
+// force-change-on-login so the one-time password cannot be replayed.
+const recoveryAttempts = new Map<string, { count: number; resetAt: number }>();
+app.post('/api/auth/admin-recovery', validate(adminRecoverySchema), async (req: Request, res: Response) => {
+  const expected = process.env.ADMIN_RECOVERY_KEY;
+  if (!expected) {
+    return res.status(503).json({ error: 'Admin recovery is not configured' });
+  }
+  const ip = req.ip || 'unknown';
+  const now = Date.now();
+  const attempt = recoveryAttempts.get(ip);
+  if (attempt && attempt.count >= 5 && attempt.resetAt > now) {
+    return res.status(429).json({ error: 'Too many attempts. Try again in 15 minutes.' });
+  }
+  const { username, key } = req.body as { username?: string; key?: string };
+  if (!username || !username.trim()) {
+    return res.status(400).json({ error: 'Username is required' });
+  }
+  if (!key || typeof key !== 'string') {
+    return res.status(400).json({ error: 'Recovery key is required' });
+  }
+  const user = state.users.find(
+    (u) => u.username.toLowerCase() === username.trim().toLowerCase()
+  );
+  if (!user || user.role !== 'ADMINISTRATOR') {
+    return res.status(403).json({ error: 'Invalid credentials for admin recovery' });
+  }
+
+  const keyBuf = Buffer.from(key);
+  const expectedBuf = Buffer.from(expected);
+  const keyOk =
+    keyBuf.length === expectedBuf.length && timingSafeEqual(keyBuf, expectedBuf);
+  if (!keyOk) {
+    recoveryAttempts.set(ip, {
+      count: (attempt?.count ?? 0) + 1,
+      resetAt: now + 1000 * 60 * 15,
+    });
+    return res.status(403).json({ error: 'Invalid recovery key' });
+  }
+  recoveryAttempts.delete(ip);
+
+  const oneTimePassword = randomBytes(9).toString('base64url');
+  const before = state;
+  const after = performAdminRecovery(state, user, hashPassword(oneTimePassword));
+  await commit(res, before, after, {
+    ok: true,
+    oneTimePassword,
+    message: 'Password reset. Use the one-time password to log in, then set a new one.',
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -208,50 +361,9 @@ app.get('/api/health', (_req: Request, res: Response) => {
   res.json({ ok: true });
 });
 
-// Everything below requires a valid session.
-app.use('/api', authenticate);
-
-// ---------------------------------------------------------------------------
-// Auth session reads
-// ---------------------------------------------------------------------------
-
-app.post('/api/auth/logout', (_req: Request, res: Response) => {
-  // The client discards the token. A revocation store can be added later.
-  res.json({ ok: true });
-});
-
-app.patch('/api/auth/password', async (req: Request, res: Response) => {
-  const user = actor(req);
-  const { currentPassword, newPassword } = req.body as {
-    currentPassword?: string;
-    newPassword?: string;
-  };
-  if (!currentPassword) {
-    return res.status(400).json({ error: 'Current password is required' });
-  }
-  if (!newPassword || newPassword.length < 6) {
-    return res.status(400).json({ error: 'New password must be at least 6 characters long' });
-  }
-  if (!verifyPassword(currentPassword, user.passwordHash)) {
-    return res.status(400).json({ error: 'Current password is incorrect' });
-  }
-  const before = state;
-  const after = updateUser(
-    state,
-    user.id,
-    { passwordHash: hashPassword(newPassword), mustChangePassword: false },
-    user
-  );
-  const updated = after.users.find((u) => u.id === user.id);
-  await commit(res, before, after, { ok: true, user: publicUser(updated!) });
-});
-
-app.get('/api/auth/me', (req: Request, res: Response) => {
-  res.json({ user: publicUser(actor(req)) });
-});
-
 // Server-Sent Events stream — notifies browsers when state changes.
 // EventSource cannot send headers, so the JWT is passed as a query parameter.
+// Registered BEFORE the auth middleware so the query token is what gets verified.
 app.get('/api/events', (req: Request, res: Response) => {
   const token = String(req.query.token || '');
   const payload = verifyToken(token);
@@ -276,6 +388,51 @@ app.get('/api/events', (req: Request, res: Response) => {
   });
 });
 
+// Everything below requires a valid session.
+app.use('/api', authenticate);
+
+// CSRF protection for state-changing operations
+app.use('/api', csrfProtection);
+
+// ---------------------------------------------------------------------------
+// Auth session reads
+// ---------------------------------------------------------------------------
+
+app.post('/api/auth/logout', (_req: Request, res: Response) => {
+  // The client discards the token. A revocation store can be added later.
+  res.json({ ok: true });
+});
+
+app.patch('/api/auth/password', validate(changePasswordSchema), async (req: Request, res: Response) => {
+  const user = actor(req);
+  const { currentPassword, newPassword } = req.body as {
+    currentPassword?: string;
+    newPassword?: string;
+  };
+  if (!currentPassword) {
+    return res.status(400).json({ error: 'Current password is required' });
+  }
+  if (!newPassword || newPassword.length < 6) {
+    return res.status(400).json({ error: 'New password must be at least 6 characters long' });
+  }
+  if (!verifyPassword(currentPassword, user.passwordHash)) {
+    return res.status(400).json({ error: 'Current password is incorrect' });
+  }
+  const before = state;
+  const after = updateUser(
+    state,
+    user.id,
+    { passwordHash: hashPassword(newPassword), mustChangePassword: false, passwordResetRequested: false },
+    user
+  );
+  const updated = after.users.find((u) => u.id === user.id);
+  await commit(res, before, after, { ok: true, user: publicUser(updated!) });
+});
+
+app.get('/api/auth/me', (req: Request, res: Response) => {
+  res.json({ user: publicUser(actor(req)) });
+});
+
 // ---------------------------------------------------------------------------
 // Reads
 // ---------------------------------------------------------------------------
@@ -285,11 +442,11 @@ app.get('/api/state', (req: Request, res: Response) => {
 });
 
 app.get('/api/tickets', (req: Request, res: Response) => {
-  const { status, branchId, assignedToId, requesterId, category, priority } = req.query as Record<
+  const { status, branchId, assignedToId, requesterId, category } = req.query as Record<
     string,
     string | undefined
   >;
-  res.json({ tickets: ticketListForViewer(state, actor(req), { status, branchId, assignedToId, requesterId, category, priority }) });
+  res.json({ tickets: ticketListForViewer(state, actor(req), { status, branchId, assignedToId, requesterId, category }) });
 });
 
 app.get('/api/tickets/:id', (req: Request, res: Response) => {
@@ -349,23 +506,13 @@ app.get('/api/audit-logs', (req: Request, res: Response) => {
 // Mutations
 // ---------------------------------------------------------------------------
 
-app.post('/api/tickets', async (req: Request, res: Response) => {
-  const params = req.body as {
-    subject?: string;
-    description?: string;
-    category?: Ticket['category'];
-    priority?: Ticket['priority'];
-    attachmentName?: string;
-  };
-  if (!params?.subject || !params?.description || !params?.category || !params?.priority) {
-    return res.status(400).json({ error: 'subject, description, category, and priority are required' });
-  }
+app.post('/api/tickets', validate(createTicketSchema), async (req: Request, res: Response) => {
+  const params = req.body;
   const before = state;
   const after = createTicket(state, {
     subject: params.subject!,
     description: params.description!,
     category: params.category!,
-    priority: params.priority!,
     attachmentName: params.attachmentName,
     currentUser: actor(req),
   });
@@ -373,11 +520,8 @@ app.post('/api/tickets', async (req: Request, res: Response) => {
   await commit(res, before, after, { ticket: created });
 });
 
-app.patch('/api/tickets/:id/status', async (req: Request, res: Response) => {
-  const { newStatus, notes } = req.body as { newStatus?: TicketStatus; notes?: string };
-  if (!newStatus) {
-    return res.status(400).json({ error: 'newStatus is required' });
-  }
+app.patch('/api/tickets/:id/status', validate(updateTicketStatusSchema), async (req: Request, res: Response) => {
+  const { newStatus, notes } = req.body;
   const before = state;
   const after = updateTicketStatus(state, req.params.id, newStatus, actor(req), notes);
   if (after === before) return res.status(404).json({ error: 'Ticket not found' });
@@ -385,11 +529,11 @@ app.patch('/api/tickets/:id/status', async (req: Request, res: Response) => {
   await commit(res, before, after, { ticket: updated });
 });
 
-app.patch('/api/tickets/:id/assign', async (req: Request, res: Response) => {
-  const { staffUserId } = req.body as { staffUserId?: string };
+app.patch('/api/tickets/:id/assign', validate(assignTicketSchema), async (req: Request, res: Response) => {
+  const { staffUserId } = req.body;
   const staffUser = state.users.find((u) => u.id === staffUserId && (u.role === 'IT_STAFF' || u.role === 'ADMINISTRATOR'));
   if (!staffUser) {
-    return res.status(400).json({ error: 'A valid IT staff member is required' });
+    return res.status(400).json({ error: 'A valid IT specialist member is required' });
   }
   const before = state;
   const after = assignTicket(state, req.params.id, staffUser, actor(req));
@@ -398,23 +542,8 @@ app.patch('/api/tickets/:id/assign', async (req: Request, res: Response) => {
   await commit(res, before, after, { ticket: updated });
 });
 
-app.patch('/api/tickets/:id/priority', async (req: Request, res: Response) => {
-  const { newPriority } = req.body as { newPriority?: TicketPriority };
-  if (!newPriority) {
-    return res.status(400).json({ error: 'newPriority is required' });
-  }
-  const before = state;
-  const after = updateTicketPriority(state, req.params.id, newPriority, actor(req));
-  if (after === before) return res.status(404).json({ error: 'Ticket not found' });
-  const updated = after.tickets.find((t) => t.id === req.params.id);
-  await commit(res, before, after, { ticket: updated });
-});
-
-app.post('/api/tickets/:id/comments', async (req: Request, res: Response) => {
-  const { content, isInternal } = req.body as { content?: string; isInternal?: boolean };
-  if (!content?.trim()) {
-    return res.status(400).json({ error: 'content is required' });
-  }
+app.post('/api/tickets/:id/comments', validate(addCommentSchema), async (req: Request, res: Response) => {
+  const { content, isInternal } = req.body;
   const before = state;
   const after = addComment(state, {
     ticketId: req.params.id,
@@ -443,31 +572,27 @@ app.post('/api/notifications/read-all', async (req: Request, res: Response) => {
 // Admin management (users & branches)
 // ---------------------------------------------------------------------------
 
-app.post('/api/users', async (req: Request, res: Response) => {
+app.post('/api/users', validate(createUserSchema), async (req: Request, res: Response) => {
   if (!requireAdmin(req, res)) return;
-  const { user } = req.body as { user?: CreateUserParams };
-  if (!user?.username || !user?.name || !user?.role || !user?.email) {
-    return res.status(400).json({ error: 'username, name, role, and email are required' });
-  }
+  const { username, name, role, email, branchId, password } = req.body;
   const before = state;
   const after = createUser(
     state,
-    { ...user, passwordHash: hashPassword(user.password || DEFAULT_PASSWORD), mustChangePassword: true },
+    { username, name, role, email, branchId, passwordHash: hashPassword(password || DEFAULT_PASSWORD), mustChangePassword: true },
     actor(req)
   );
   const created = after.users[after.users.length - 1];
   await commit(res, before, after, { user: publicUser(created) });
 });
 
-app.patch('/api/users/:id', async (req: Request, res: Response) => {
+app.patch('/api/users/:id', validate(updateUserSchema), async (req: Request, res: Response) => {
   if (!requireAdmin(req, res)) return;
-  const { changes } = req.body as { changes?: UpdateUserChanges };
-  if (!changes) return res.status(400).json({ error: 'changes are required' });
+  const changes = req.body;
   const before = state;
   const withPassword: UpdateUserChanges = {
     ...changes,
     passwordHash: changes.password ? hashPassword(changes.password) : changes.passwordHash,
-    ...(changes.password ? { mustChangePassword: true } : {}),
+    ...(changes.password ? { mustChangePassword: true, passwordResetRequested: false } : {}),
   };
   const after = updateUser(state, req.params.id, withPassword, actor(req));
   if (after === before) return res.status(404).json({ error: 'User not found or cannot be updated' });
@@ -483,35 +608,28 @@ app.delete('/api/users/:id', async (req: Request, res: Response) => {
   await commit(res, before, after, { ok: true });
 });
 
-app.patch('/api/users/:id/assignments', async (req: Request, res: Response) => {
+app.patch('/api/users/:id/assignments', validate(updateAssignmentsSchema), async (req: Request, res: Response) => {
   if (!requireAdmin(req, res)) return;
-  const { assignments } = req.body as { assignments?: BranchAssignment[] };
-  if (!Array.isArray(assignments)) {
-    return res.status(400).json({ error: 'assignments are required' });
-  }
+  const { assignments } = req.body;
   const before = state;
   const after = updateStaffAssignments(state, req.params.id, assignments, actor(req));
-  if (after === before) return res.status(404).json({ error: 'IT staff user not found' });
+  if (after === before) return res.status(404).json({ error: 'IT specialist user not found' });
   const updated = after.users.find((u) => u.id === req.params.id);
   await commit(res, before, after, { user: publicUser(updated!) });
 });
 
-app.post('/api/branches', async (req: Request, res: Response) => {
+app.post('/api/branches', validate(createBranchSchema), async (req: Request, res: Response) => {
   if (!requireAdmin(req, res)) return;
-  const { branch } = req.body as { branch?: CreateBranchParams };
-  if (!branch?.code || !branch?.name) {
-    return res.status(400).json({ error: 'branch code and name are required' });
-  }
+  const { name, location, code } = req.body;
   const before = state;
-  const after = createBranch(state, branch, actor(req));
+  const after = createBranch(state, { name, location, code, status: 'Active' }, actor(req));
   const created = after.branches[after.branches.length - 1];
   await commit(res, before, after, { branch: created });
 });
 
-app.patch('/api/branches/:id', async (req: Request, res: Response) => {
+app.patch('/api/branches/:id', validate(updateBranchSchema), async (req: Request, res: Response) => {
   if (!requireAdmin(req, res)) return;
-  const { changes } = req.body as { changes?: Partial<Branch> };
-  if (!changes) return res.status(400).json({ error: 'changes are required' });
+  const changes = req.body;
   const before = state;
   const after = updateBranch(state, req.params.id, changes, actor(req));
   if (after === before) return res.status(404).json({ error: 'Branch not found' });
@@ -539,6 +657,14 @@ app.post('/api/reset', async (req: Request, res: Response) => {
 });
 
 // ---------------------------------------------------------------------------
+// API 404: unknown /api routes return JSON, never the SPA shell.
+// ---------------------------------------------------------------------------
+
+app.use('/api', (_req: Request, res: Response) => {
+  res.status(404).json({ error: 'Not found' });
+});
+
+// ---------------------------------------------------------------------------
 // Static hosting (production)
 // ---------------------------------------------------------------------------
 
@@ -550,8 +676,9 @@ if (fs.existsSync(dist)) {
   });
 }
 
-app.listen(PORT, async () => {
+httpServer.listen(PORT, async () => {
   console.log(`[service-desk] API listening on http://localhost:${PORT}`);
+  console.log(`[service-desk] WebSocket server ready on ws://localhost:${PORT}/api/ws`);
   try {
     await initDatabase();
     await seedIfEmpty();
@@ -564,7 +691,10 @@ app.listen(PORT, async () => {
   }
 });
 
-process.on('SIGINT', async () => {
+async function shutdown(): Promise<void> {
   await closeDatabase();
   process.exit(0);
-});
+}
+
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);

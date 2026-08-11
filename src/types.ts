@@ -13,17 +13,12 @@ export type TicketCategory =
   | 'IT Equipment'
   | 'Other IT Concern';
 
-export type TicketPriority = 'Low' | 'Medium' | 'High' | 'Critical';
-
 export type TicketStatus =
-  | 'New'
   | 'Assigned'
   | 'In Progress'
   | 'Pending'
   | 'Resolved'
-  | 'Closed'
-  | 'Reopened'
-  | 'Cancelled';
+  | 'Closed';
 
 export interface User {
   id: string;
@@ -40,6 +35,8 @@ export interface User {
   passwordHash?: string;
   /** True when the user must set a new password on their next login. */
   mustChangePassword?: boolean;
+  /** True when the user has requested a password reset and the admin has not resolved it yet. */
+  passwordResetRequested?: boolean;
 }
 
 export interface BranchAssignment {
@@ -52,9 +49,9 @@ export interface BranchAssignment {
 
 export interface Branch {
   id: string;
-  code: string;
   name: string;
   location: string;
+  code?: string;
   status: 'Active' | 'Inactive';
   userCount: number;
 }
@@ -63,8 +60,6 @@ export interface CategoryInfo {
   id: string;
   name: TicketCategory;
   description: string;
-  slaTargetHours: string; // Display string e.g. "4 - 24 hrs (TBD)"
-  slaHours: number; // Numeric SLA target (hours) used for breach tracking
   status: 'Active' | 'Proposed';
 }
 
@@ -102,7 +97,6 @@ export interface Ticket {
   subject: string;
   description: string;
   category: TicketCategory;
-  priority: TicketPriority;
   status: TicketStatus;
   requesterId: string;
   requesterName: string;
@@ -157,7 +151,8 @@ export type ActiveView =
   | 'activity_logs'
   | 'reports'
   | 'profile'
-  | 'requirements';
+  | 'requirements'
+  | 'wallboard';
 
 /**
  * The full persisted application state. The Express server is the source of

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, TicketCategory, TicketPriority, Ticket } from '../types';
+import { User, TicketCategory, Ticket } from '../types';
 import { ArrowLeft, CheckCircle2, Upload, AlertCircle, FileText, Send, Building } from 'lucide-react';
 
 interface CreateTicketViewProps {
@@ -8,7 +8,6 @@ interface CreateTicketViewProps {
     subject: string;
     description: string;
     category: TicketCategory;
-    priority: TicketPriority;
     attachmentName?: string;
   }) => Promise<Ticket>;
   onNavigateBack: () => void;
@@ -24,7 +23,6 @@ export const CreateTicketView: React.FC<CreateTicketViewProps> = ({
   const [category, setCategory] = useState<TicketCategory>('Hardware');
   const [subject, setSubject] = useState('');
   const [description, setDescription] = useState('');
-  const [priority, setPriority] = useState<TicketPriority>('Medium');
   const [attachmentName, setAttachmentName] = useState<string>('');
   const [formError, setFormError] = useState('');
   const [createdTicket, setCreatedTicket] = useState<Ticket | null>(null);
@@ -63,7 +61,6 @@ export const CreateTicketView: React.FC<CreateTicketViewProps> = ({
       subject: subject.trim(),
       description: description.trim(),
       category,
-      priority,
       attachmentName: attachmentName || undefined,
     });
 
@@ -107,7 +104,7 @@ export const CreateTicketView: React.FC<CreateTicketViewProps> = ({
             <span className="text-xs font-bold text-slate-500 uppercase tracking-widest block">
               Generated Ticket Number
             </span>
-            <span className="text-3xl font-black font-mono text-blue-900 block">
+            <span className="text-3xl font-black font-mono text-emerald-900 block">
               #{createdTicket.id}
             </span>
             <span className="text-xs text-slate-600 block pt-1">
@@ -118,7 +115,7 @@ export const CreateTicketView: React.FC<CreateTicketViewProps> = ({
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
             <button
               onClick={() => onNavigateTicketDetail(createdTicket.id)}
-              className="w-full sm:w-auto px-6 py-2.5 bg-blue-900 hover:bg-blue-800 text-white font-bold text-xs rounded-xl transition shadow-md cursor-pointer"
+              className="w-full sm:w-auto px-6 py-2.5 bg-emerald-900 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl transition shadow-md cursor-pointer"
             >
               View Ticket Details
             </button>
@@ -135,7 +132,7 @@ export const CreateTicketView: React.FC<CreateTicketViewProps> = ({
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="p-6 border-b border-slate-200 bg-slate-900 text-white">
             <h2 className="text-xl font-bold tracking-tight">Create IT Service Request</h2>
-            <p className="text-xs text-blue-200 mt-1">
+            <p className="text-xs text-emerald-200 mt-1">
               Submit hardware, software, or network issues to Main IT Department
             </p>
           </div>
@@ -155,7 +152,7 @@ export const CreateTicketView: React.FC<CreateTicketViewProps> = ({
                   Requesting Branch
                 </label>
                 <div className="flex items-center gap-2 text-sm font-bold text-slate-800">
-                  <Building className="w-4 h-4 text-blue-600" />
+                  <Building className="w-4 h-4 text-emerald-600" />
                   <span>{currentUser.branchName || 'Unisan Branch'}</span>
                   <span className="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-mono">
                     READ-ONLY
@@ -181,7 +178,7 @@ export const CreateTicketView: React.FC<CreateTicketViewProps> = ({
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value as TicketCategory)}
-                className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600"
               >
                 {categoriesList.map((cat) => (
                   <option key={cat} value={cat}>
@@ -201,7 +198,7 @@ export const CreateTicketView: React.FC<CreateTicketViewProps> = ({
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
                 placeholder="e.g. Printer is not working at Counter 1"
-                className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600"
               />
             </div>
 
@@ -215,43 +212,8 @@ export const CreateTicketView: React.FC<CreateTicketViewProps> = ({
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Please describe the problem or request in detail. Include any error messages displayed, station numbers, or steps leading up to the issue."
-                className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600 leading-relaxed"
+                className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 leading-relaxed"
               />
-            </div>
-
-            {/* Priority Selection */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider">
-                  Initial Priority Classification <span className="text-red-500">*</span>
-                </label>
-                <span className="text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
-                  Note: Priority classification is subject to IT review.
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {(['Low', 'Medium', 'High', 'Critical'] as TicketPriority[]).map((p) => (
-                  <label
-                    key={p}
-                    className={`p-3 rounded-xl border text-center cursor-pointer transition flex flex-col items-center justify-center gap-1 ${
-                      priority === p
-                        ? 'bg-blue-900 text-white border-blue-900 font-bold shadow-md'
-                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 font-medium'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="priority"
-                      value={p}
-                      checked={priority === p}
-                      onChange={() => setPriority(p)}
-                      className="sr-only"
-                    />
-                    <span className="text-xs">{p}</span>
-                  </label>
-                ))}
-              </div>
             </div>
 
             {/* File Attachment Simulator */}
@@ -268,8 +230,8 @@ export const CreateTicketView: React.FC<CreateTicketViewProps> = ({
                 <div className="flex flex-col items-center justify-center gap-1.5">
                   <Upload className="w-6 h-6 text-slate-400" />
                   {attachmentName ? (
-                    <div className="text-xs font-bold text-blue-900 flex items-center gap-1">
-                      <FileText className="w-4 h-4 text-blue-600" />
+                    <div className="text-xs font-bold text-emerald-900 flex items-center gap-1">
+                      <FileText className="w-4 h-4 text-emerald-600" />
                       <span>{attachmentName}</span>
                     </div>
                   ) : (
@@ -295,7 +257,7 @@ export const CreateTicketView: React.FC<CreateTicketViewProps> = ({
               </button>
               <button
                 type="submit"
-                className="px-6 py-2.5 bg-blue-900 hover:bg-blue-800 text-white font-bold text-xs rounded-xl transition shadow-md flex items-center gap-2 cursor-pointer"
+                className="px-6 py-2.5 bg-emerald-900 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl transition shadow-md flex items-center gap-2 cursor-pointer"
               >
                 <Send className="w-4 h-4" />
                 <span>Submit IT Request</span>

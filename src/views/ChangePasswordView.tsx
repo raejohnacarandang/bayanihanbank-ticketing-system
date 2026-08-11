@@ -198,7 +198,7 @@ export const ChangePasswordView: React.FC<ChangePasswordViewProps> = ({
       </div>
 
       <footer className="text-center text-emerald-300/70 text-[11px] py-4 border-t border-emerald-900/80">
-        Bayanihan Bank IT Service Desk Prototype — Internal Trainee Project
+        Bayanihan Bank IT Service Desk
       </footer>
     </div>
   );

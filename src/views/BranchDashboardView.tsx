@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { Ticket, User, TicketStatus } from '../types';
-import { StatusBadge, PriorityBadge, SlaBadge } from '../components/Badge';
-import { slaStatusFor } from '../services/store';
-import { PlusCircle, Ticket as TicketIcon, Clock, CheckCircle2, AlertCircle, PlayCircle, Eye, Search, Filter, AlarmClockOff } from 'lucide-react';
+import { StatusBadge } from '../components/Badge';
+import { PlusCircle, Ticket as TicketIcon, CheckCircle2, PlayCircle, Eye, Search } from 'lucide-react';
 
 interface BranchDashboardViewProps {
   currentUser: User;
@@ -26,17 +25,13 @@ export const BranchDashboardView: React.FC<BranchDashboardViewProps> = ({
   );
 
   const totalCount = branchTickets.length;
-  const newCount = branchTickets.filter((t) => t.status === 'New').length;
   const inProgressCount = branchTickets.filter((t) => t.status === 'In Progress' || t.status === 'Assigned').length;
   const resolvedCount = branchTickets.filter((t) => t.status === 'Resolved').length;
-  const closedCount = branchTickets.filter((t) => t.status === 'Closed').length;
-  const slaBreachedCount = branchTickets.filter((t) => slaStatusFor(t) === 'breached').length;
 
   const filteredTickets = branchTickets.filter((t) => {
     const matchesStatus =
       selectedStatusFilter === 'ALL' ||
-      (selectedStatusFilter === 'OPEN' && t.status !== 'Closed' && t.status !== 'Cancelled') ||
-      (selectedStatusFilter === 'SLA_BREACHED' && slaStatusFor(t) === 'breached') ||
+      (selectedStatusFilter === 'OPEN' && t.status !== 'Closed') ||
       t.status === selectedStatusFilter;
 
     const matchesSearch =
@@ -90,12 +85,12 @@ export const BranchDashboardView: React.FC<BranchDashboardViewProps> = ({
       </div>
 
       {/* Summary Metrics Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
         <div
           onClick={() => setSelectedStatusFilter('ALL')}
           className={`p-4 rounded-xl border transition cursor-pointer ${
             selectedStatusFilter === 'ALL'
-              ? 'bg-slate-900 text-white border-slate-800 shadow-md ring-2 ring-blue-500'
+              ? 'bg-slate-900 text-white border-slate-800 shadow-md ring-2 ring-emerald-500'
               : 'bg-white text-slate-900 border-slate-200 hover:border-slate-300'
           }`}
         >
@@ -103,30 +98,10 @@ export const BranchDashboardView: React.FC<BranchDashboardViewProps> = ({
             selectedStatusFilter === 'ALL' ? 'text-slate-300' : 'text-slate-400'
           }`}>
             <span>Total Tickets</span>
-            <TicketIcon className={`w-4 h-4 ${selectedStatusFilter === 'ALL' ? 'text-blue-300' : 'text-blue-500'}`} />
+            <TicketIcon className={`w-4 h-4 ${selectedStatusFilter === 'ALL' ? 'text-emerald-300' : 'text-emerald-500'}`} />
           </div>
           <div className="text-2xl sm:text-3xl font-black mt-2">{totalCount}</div>
           <div className={`text-[11px] mt-1 ${selectedStatusFilter === 'ALL' ? 'text-slate-400' : 'text-slate-500'}`}>Submitted from branch</div>
-        </div>
-
-        <div
-          onClick={() => setSelectedStatusFilter('New')}
-          className={`p-4 rounded-xl border transition cursor-pointer ${
-            selectedStatusFilter === 'New'
-              ? 'bg-blue-900 text-white border-blue-800 shadow-md ring-2 ring-blue-400'
-              : 'bg-white text-slate-900 border-slate-200 hover:border-blue-200'
-          }`}
-        >
-          <div className={`text-xs font-bold uppercase tracking-wider flex items-center justify-between ${
-            selectedStatusFilter === 'New' ? 'text-blue-300' : 'text-blue-600'
-          }`}>
-            <span>New</span>
-            <AlertCircle className={`w-4 h-4 ${selectedStatusFilter === 'New' ? 'text-blue-300' : 'text-blue-500'}`} />
-          </div>
-          <div className={`text-2xl sm:text-3xl font-black mt-2 ${
-            selectedStatusFilter === 'New' ? 'text-blue-50' : 'text-blue-900'
-          }`}>{newCount}</div>
-          <div className={`text-[11px] mt-1 ${selectedStatusFilter === 'New' ? 'text-blue-200' : 'text-slate-500'}`}>Awaiting IT triage</div>
         </div>
 
         <div
@@ -168,46 +143,6 @@ export const BranchDashboardView: React.FC<BranchDashboardViewProps> = ({
           }`}>{resolvedCount}</div>
           <div className={`text-[11px] mt-1 ${selectedStatusFilter === 'Resolved' ? 'text-emerald-200' : 'text-slate-500'}`}>Needs branch confirmation</div>
         </div>
-
-        <div
-          onClick={() => setSelectedStatusFilter('Closed')}
-          className={`p-4 rounded-xl border transition cursor-pointer ${
-            selectedStatusFilter === 'Closed'
-              ? 'bg-gray-800 text-white border-gray-700 shadow-md ring-2 ring-gray-400'
-              : 'bg-white text-slate-900 border-slate-200 hover:border-slate-300'
-          }`}
-        >
-          <div className={`text-xs font-bold uppercase tracking-wider flex items-center justify-between ${
-            selectedStatusFilter === 'Closed' ? 'text-slate-300' : 'text-slate-600'
-          }`}>
-            <span>Closed</span>
-            <Clock className={`w-4 h-4 ${selectedStatusFilter === 'Closed' ? 'text-slate-300' : 'text-slate-500'}`} />
-          </div>
-          <div className={`text-2xl sm:text-3xl font-black mt-2 ${
-            selectedStatusFilter === 'Closed' ? 'text-slate-50' : 'text-slate-800'
-          }`}>{closedCount}</div>
-          <div className={`text-[11px] mt-1 ${selectedStatusFilter === 'Closed' ? 'text-slate-400' : 'text-slate-500'}`}>Fully completed</div>
-        </div>
-
-        <div
-          onClick={() => setSelectedStatusFilter('SLA_BREACHED')}
-          className={`p-4 rounded-xl border transition cursor-pointer ${
-            selectedStatusFilter === 'SLA_BREACHED'
-              ? 'bg-red-900 text-white border-red-800 shadow-md ring-2 ring-red-400'
-              : 'bg-white text-slate-900 border-slate-200 hover:border-red-300'
-          }`}
-        >
-          <div className={`text-xs font-bold uppercase tracking-wider flex items-center justify-between ${
-            selectedStatusFilter === 'SLA_BREACHED' ? 'text-red-300' : 'text-red-700'
-          }`}>
-            <span>SLA Breached</span>
-            <AlarmClockOff className={`w-4 h-4 ${selectedStatusFilter === 'SLA_BREACHED' ? 'text-red-300' : 'text-red-500'}`} />
-          </div>
-          <div className={`text-2xl sm:text-3xl font-black mt-2 ${
-            selectedStatusFilter === 'SLA_BREACHED' ? 'text-red-50' : 'text-red-900'
-          }`}>{slaBreachedCount}</div>
-          <div className={`text-[11px] mt-1 ${selectedStatusFilter === 'SLA_BREACHED' ? 'text-red-200' : 'text-slate-500'}`}>Past service target</div>
-        </div>
       </div>
 
       {/* Recent Tickets Section */}
@@ -231,21 +166,19 @@ export const BranchDashboardView: React.FC<BranchDashboardViewProps> = ({
                 placeholder="Search ticket # or subject..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 pr-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg w-full sm:w-64 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                className="pl-9 pr-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg w-full sm:w-64 focus:outline-none focus:ring-2 focus:ring-emerald-600"
               />
             </div>
 
             <select
               value={selectedStatusFilter}
               onChange={(e) => setSelectedStatusFilter(e.target.value)}
-              className="px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-600 font-medium"
+              className="px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-600 font-medium"
             >
               <option value="ALL">All Statuses</option>
               <option value="OPEN">All Open Tickets</option>
-              <option value="New">New</option>
               <option value="In Progress">In Progress</option>
               <option value="Resolved">Resolved</option>
-              <option value="Closed">Closed</option>
             </select>
           </div>
         </div>
@@ -263,7 +196,7 @@ export const BranchDashboardView: React.FC<BranchDashboardViewProps> = ({
               </p>
               <button
                 onClick={onNavigateNewRequest}
-                className="px-4 py-2 bg-blue-900 hover:bg-blue-800 text-white font-semibold text-xs rounded-lg transition inline-flex items-center gap-1.5 cursor-pointer"
+                className="px-4 py-2 bg-emerald-900 hover:bg-emerald-800 text-white font-semibold text-xs rounded-lg transition inline-flex items-center gap-1.5 cursor-pointer"
               >
                 <PlusCircle className="w-4 h-4" />
                 <span>Create Your First Request</span>
@@ -276,9 +209,7 @@ export const BranchDashboardView: React.FC<BranchDashboardViewProps> = ({
                   <th className="py-3 px-4">Ticket #</th>
                   <th className="py-3 px-4">Subject</th>
                   <th className="py-3 px-4">Category</th>
-                  <th className="py-3 px-4">Priority</th>
                   <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4">SLA</th>
                   <th className="py-3 px-4">Submitted</th>
                   <th className="py-3 px-4 text-right">Action</th>
                 </tr>
@@ -288,9 +219,9 @@ export const BranchDashboardView: React.FC<BranchDashboardViewProps> = ({
                   <tr
                     key={ticket.id}
                     onClick={() => onNavigateTicketDetail(ticket.id)}
-                    className="hover:bg-blue-50/40 transition cursor-pointer group"
+                    className="hover:bg-emerald-50/40 transition cursor-pointer group"
                   >
-                    <td className="py-3 px-4 font-mono font-bold text-blue-900 group-hover:underline">
+                    <td className="py-3 px-4 font-mono font-bold text-emerald-900 group-hover:underline">
                       #{ticket.id}
                     </td>
                     <td className="py-3 px-4 max-w-xs truncate font-medium text-slate-900">
@@ -298,13 +229,7 @@ export const BranchDashboardView: React.FC<BranchDashboardViewProps> = ({
                     </td>
                     <td className="py-3 px-4 text-slate-600">{ticket.category}</td>
                     <td className="py-3 px-4">
-                      <PriorityBadge priority={ticket.priority} size="sm" />
-                    </td>
-                    <td className="py-3 px-4">
                       <StatusBadge status={ticket.status} size="sm" />
-                    </td>
-                    <td className="py-3 px-4">
-                      <SlaBadge ticket={ticket} size="sm" />
                     </td>
                     <td className="py-3 px-4 text-slate-500 whitespace-nowrap">
                       {ticket.createdAt}
@@ -315,7 +240,7 @@ export const BranchDashboardView: React.FC<BranchDashboardViewProps> = ({
                           e.stopPropagation();
                           onNavigateTicketDetail(ticket.id);
                         }}
-                        className="px-2.5 py-1 rounded bg-slate-100 hover:bg-blue-600 hover:text-white text-slate-700 font-medium transition inline-flex items-center gap-1 cursor-pointer"
+                        className="px-2.5 py-1 rounded bg-slate-100 hover:bg-emerald-600 hover:text-white text-slate-700 font-medium transition inline-flex items-center gap-1 cursor-pointer"
                       >
                         <Eye className="w-3.5 h-3.5" />
                         <span>View</span>
