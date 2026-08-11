@@ -33,6 +33,7 @@ import {
   createUser as localCreateUser,
   deleteBranch as localDeleteBranch,
   deleteUser as localDeleteUser,
+  markAllNotificationsAsRead as localMarkAllNotificationsAsRead,
   markNotificationAsRead as localMarkNotificationAsRead,
   updateBranch as localUpdateBranch,
   updateTicketPriority as localUpdateTicketPriority,
@@ -189,6 +190,28 @@ class StorageService {
       // ignore — the token is discarded locally regardless
     }
     this.clearSession();
+  }
+
+  /** Change the signed-in user's password (verifies the current password). */
+  public async changePassword(currentPassword: string, newPassword: string): Promise<User> {
+    try {
+      const json = await this.api<{ ok: boolean; user: User }>('/api/auth/password', {
+        method: 'PATCH',
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      await this.refresh();
+      this.cache.currentUser = json.user;
+      this.mirror();
+      return json.user;
+    } catch {
+      // Offline best-effort: clear the forced-change flag locally.
+      this.cache.currentUser = { ...this.cache.currentUser, mustChangePassword: false };
+      this.cache.users = this.cache.users.map((u) =>
+        u.id === this.cache.currentUser.id ? this.cache.currentUser : u
+      );
+      this.mirror();
+      return this.cache.currentUser;
+    }
   }
 
   /** Demo persona switch: log in as the target account with the demo password. */
@@ -355,6 +378,16 @@ class StorageService {
       await this.refresh();
     } catch {
       this.cache = localMarkNotificationAsRead(this.cache, id);
+      this.mirror();
+    }
+  }
+
+  public async markAllNotificationsRead(userId: string): Promise<void> {
+    try {
+      await this.api('/api/notifications/read-all', { method: 'POST' });
+      await this.refresh();
+    } catch {
+      this.cache = localMarkAllNotificationsAsRead(this.cache, userId);
       this.mirror();
     }
   }

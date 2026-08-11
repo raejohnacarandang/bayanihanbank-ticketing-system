@@ -53,9 +53,28 @@ Sessions use signed JWTs (`JWT_SECRET` in `.env`, HS256 via `node:crypto`).
 
 `npm run build && npm start` — serves the compiled frontend and API from `:3001`.
 
+Before going live, set in `.env`:
+
+- `DEMO_MODE="false"` — demo accounts are **not** seeded; only a bootstrap
+  `admin` account is created with a random one-time password (printed to the
+  server log on first run). `/api/auth/demo-accounts` is disabled.
+- `JWT_SECRET` — a long random value (generate with `node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"`).
+- `APP_URL` — the public URL of the app.
+- Real `DB_*` credentials for the production MySQL server.
+
+Then run on the production database:
+
+- `npm run backup` — `mysqldump` snapshot into `backups/` (keep the last 10).
+- `npm run force-password-reset` — rotates every user's password to a random
+  one-time password and forces a change on next login (hand these to the users).
+
+Terminate TLS with a reverse proxy; see `deploy/nginx.conf.example`.
+
 ### Other scripts
 
 - `npm run lint` — TypeScript type check (`tsc --noEmit`)
 - `npm test` — vitest unit tests for the shared store logic
 - `npm run dev:web` — Vite only (expects the API already on `:3001`)
 - `npm run dev:server` — API only
+- `npm run backup` — MySQL backup via mysqldump into `backups/`
+- `npm run force-password-reset` — rotate all passwords + force change on next login

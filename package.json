@@ -8,9 +8,12 @@
     "dev:web": "vite --port=3000 --host=0.0.0.0",
     "dev:server": "tsx server.ts",
     "build": "vite build",
-    "start": "tsx server.ts",
+    "build:server": "esbuild server.ts --bundle --platform=node --format=esm --packages=external --outfile=server.js",
+    "start": "npm run build:server && node server.js",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
+    "backup": "node scripts/backup.mjs",
+    "force-password-reset": "node scripts/force-password-reset.mjs",
     "lint": "tsc --noEmit",
     "test": "vitest run"
   },

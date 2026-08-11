@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Ticket, User, TicketCategory, TicketPriority, TicketStatus } from '../types';
 import { StatusBadge, PriorityBadge, SlaBadge } from '../components/Badge';
-import { Search, Filter, X, Eye, Ticket as TicketIcon, PlusCircle, Building, UserCheck } from 'lucide-react';
+import { slaInfoFor } from '../services/store';
+import { Search, Filter, X, Eye, Ticket as TicketIcon, PlusCircle, Building, UserCheck, Download, ChevronLeft, ChevronRight } from 'lucide-react';
+
+const PAGE_SIZE = 10;
 
 interface TicketListViewProps {
   currentUser: User;
@@ -12,6 +15,7 @@ interface TicketListViewProps {
   subtitle: string;
   onNavigateTicketDetail: (ticketId: string) => void;
   onNavigateNewRequest?: () => void;
+  initialStatusFilter?: string;
 }
 
 export const TicketListView: React.FC<TicketListViewProps> = ({
@@ -23,13 +27,15 @@ export const TicketListView: React.FC<TicketListViewProps> = ({
   subtitle,
   onNavigateTicketDetail,
   onNavigateNewRequest,
+  initialStatusFilter,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [statusFilter, setStatusFilter] = useState<string>(initialStatusFilter ?? 'ALL');
   const [priorityFilter, setPriorityFilter] = useState<string>('ALL');
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
   const [branchFilter, setBranchFilter] = useState<string>('ALL');
   const [assignedFilter, setAssignedFilter] = useState<string>('ALL');
+  const [page, setPage] = useState(1);
 
   const categoriesList: TicketCategory[] = [
     'Hardware',
@@ -85,6 +91,65 @@ export const TicketListView: React.FC<TicketListViewProps> = ({
     );
   });
 
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm, statusFilter, priorityFilter, categoryFilter, branchFilter, assignedFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredTickets.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pageTickets = filteredTickets.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
+  );
+
+  const csvEscape = (value: string): string => {
+    const safe = value.replace(/"/g, '""');
+    return /[",\n]/.test(safe) ? `"${safe}"` : safe;
+  };
+
+  const handleExportCsv = () => {
+    const headers = [
+      'Ticket #',
+      'Subject',
+      'Description',
+      'Category',
+      'Priority',
+      'Status',
+      'SLA',
+      'Branch',
+      'Requester',
+      'Assigned To',
+      'Submitted',
+      'Updated',
+    ];
+    const rows = filteredTickets.map((t) => [
+      t.id,
+      t.subject,
+      t.description,
+      t.category,
+      t.priority,
+      t.status,
+      slaInfoFor(t).label,
+      t.branchName,
+      t.requesterName,
+      t.assignedToName || 'Unassigned',
+      t.createdAt,
+      t.updatedAt,
+    ]);
+    const csv = [headers, ...rows]
+      .map((row) => row.map((cell) => csvEscape(String(cell))).join(','))
+      .join('\n');
+    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `tickets-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="space-y-6">
       {/* Title Header */}
@@ -94,15 +159,26 @@ export const TicketListView: React.FC<TicketListViewProps> = ({
           <p className="text-xs text-slate-500 mt-1">{subtitle}</p>
         </div>
 
-        {onNavigateNewRequest && (
+        <div className="flex items-center gap-2">
+          {onNavigateNewRequest && (
+            <button
+              onClick={onNavigateNewRequest}
+              className="px-4 py-2 bg-blue-900 hover:bg-blue-800 text-white font-bold text-xs rounded-xl transition shadow-sm flex items-center gap-1.5 cursor-pointer"
+            >
+              <PlusCircle className="w-4 h-4" />
+              <span>+ New IT Request</span>
+            </button>
+          )}
           <button
-            onClick={onNavigateNewRequest}
-            className="px-4 py-2 bg-blue-900 hover:bg-blue-800 text-white font-bold text-xs rounded-xl transition shadow-sm flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
+            onClick={handleExportCsv}
+            disabled={filteredTickets.length === 0}
+            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs rounded-xl transition shadow-sm flex items-center gap-1.5 cursor-pointer"
+            title="Download filtered tickets as CSV"
           >
-            <PlusCircle className="w-4 h-4" />
-            <span>+ New IT Request</span>
+            <Download className="w-4 h-4" />
+            <span>Export CSV</span>
           </button>
-        )}
+        </div>
       </div>
 
       {/* Filter and Search Bar Card */}
@@ -236,7 +312,7 @@ export const TicketListView: React.FC<TicketListViewProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredTickets.map((ticket) => (
+                {pageTickets.map((ticket) => (
                   <tr
                     key={ticket.id}
                     onClick={() => onNavigateTicketDetail(ticket.id)}
@@ -290,6 +366,40 @@ export const TicketListView: React.FC<TicketListViewProps> = ({
           )}
         </div>
       </div>
+
+      {/* Pagination */}
+      {filteredTickets.length > PAGE_SIZE && (
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <span className="text-xs text-slate-500">
+            Showing{' '}
+            <strong>
+              {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredTickets.length)}
+            </strong>{' '}
+            of <strong>{filteredTickets.length}</strong> tickets
+          </span>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed text-slate-700 font-semibold text-xs inline-flex items-center gap-1 cursor-pointer"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+              <span>Prev</span>
+            </button>
+            <span className="px-3 py-1.5 rounded-lg bg-blue-900 text-white font-bold text-xs">
+              {currentPage} / {totalPages}
+            </span>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed text-slate-700 font-semibold text-xs inline-flex items-center gap-1 cursor-pointer"
+            >
+              <span>Next</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

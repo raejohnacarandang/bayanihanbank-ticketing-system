@@ -15,15 +15,15 @@ export const BayanihanLogo: React.FC<BayanihanLogoProps> = ({
   subtitleText = 'IT Service Desk',
   className = '',
   lightBackground = false,
-  logoUrl = '/bayanihan-logo.png',
+  logoUrl = '/logo1.png',
 }) => {
   const [imageFailed, setImageFailed] = useState(false);
 
   const badgeSizes = {
-    sm: 'w-7 h-7 text-xs',
-    md: 'w-9 h-9 text-sm',
-    lg: 'w-11 h-11 text-base',
-    xl: 'w-16 h-16 text-2xl',
+    sm: 'w-10 h-10 text-xs',
+    md: 'w-13 h-13 text-sm',
+    lg: 'w-16 h-16 text-base',
+    xl: 'w-24 h-24 text-2xl',
   }[size];
 
   const titleSizes = {

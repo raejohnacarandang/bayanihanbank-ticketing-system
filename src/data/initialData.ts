@@ -82,6 +82,14 @@ export const INITIAL_USERS: User[] = [
     department: 'System Administration',
     email: 'admin@bayanihanbank.demo',
   },
+  {
+    id: 'usr-006',
+    username: 'auditor',
+    name: 'Audit Team',
+    role: 'AUDITOR',
+    department: 'Audit & Compliance Team',
+    email: 'audit.team@bayanihanbank.demo',
+  },
 ];
 
 export const INITIAL_BRANCHES: Branch[] = [

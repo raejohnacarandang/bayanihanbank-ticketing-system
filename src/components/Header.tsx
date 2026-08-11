@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { User, NotificationItem, UserRole } from '../types';
 import { BayanihanLogo } from './BayanihanLogo';
 import {
@@ -23,8 +23,10 @@ interface HeaderProps {
   onSwitchUser: (user: User) => void;
   onLogout: () => void;
   onOpenNotifications: () => void;
+  onMarkAllRead: () => void;
   onMarkNotificationRead: (id: string) => void;
   onNavigateTicket: (ticketId: string) => void;
+  onNavigateProfile: () => void;
   onToggleSidebar: () => void;
   isSidebarOpen: boolean;
 }
@@ -37,14 +39,37 @@ export const Header: React.FC<HeaderProps> = ({
   onSwitchUser,
   onLogout,
   onOpenNotifications,
+  onMarkAllRead,
   onMarkNotificationRead,
   onNavigateTicket,
+  onNavigateProfile,
   onToggleSidebar,
   isSidebarOpen,
 }) => {
   const [showRoleSwitcher, setShowRoleSwitcher] = useState(false);
   const [showNotifMenu, setShowNotifMenu] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const headerRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const closeMenus = () => {
+      setShowRoleSwitcher(false);
+      setShowNotifMenu(false);
+      setShowUserMenu(false);
+    };
+    const handleClickOutside = (e: MouseEvent) => {
+      if (headerRef.current && !headerRef.current.contains(e.target as Node)) closeMenus();
+    };
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeMenus();
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, []);
 
   const getRoleBadge = (role: UserRole) => {
     switch (role) {
@@ -60,7 +85,7 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="bg-emerald-950 text-white border-b border-emerald-800/80 sticky top-0 z-30 shadow-md">
+    <header ref={headerRef} className="bg-emerald-950 text-white border-b border-emerald-800/80 sticky top-0 z-30 shadow-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         {/* Left Section: Mobile Menu Button & Brand Identity */}
         <div className="flex items-center gap-3">
@@ -149,9 +174,11 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="relative">
             <button
               onClick={() => {
-                setShowNotifMenu(!showNotifMenu);
+                const opening = !showNotifMenu;
+                setShowNotifMenu(opening);
                 setShowRoleSwitcher(false);
                 setShowUserMenu(false);
+                if (opening) onMarkAllRead();
               }}
               className="relative p-2 text-slate-300 hover:text-white rounded-lg hover:bg-slate-800 transition cursor-pointer"
               title="Notifications"
@@ -244,6 +271,17 @@ export const Header: React.FC<HeaderProps> = ({
                   <div className="text-[11px] text-slate-500">{currentUser.email}</div>
                   <div className="mt-1">{getRoleBadge(currentUser.role)}</div>
                 </div>
+
+                <button
+                  onClick={() => {
+                    onNavigateProfile();
+                    setShowUserMenu(false);
+                  }}
+                  className="w-full text-left px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 rounded-lg transition flex items-center gap-2 cursor-pointer"
+                >
+                  <UserIcon className="w-4 h-4" />
+                  <span>My Profile &amp; Password</span>
+                </button>
 
                 <button
                   onClick={() => {

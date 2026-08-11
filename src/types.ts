@@ -38,6 +38,8 @@ export interface User {
   assignments?: BranchAssignment[];
   /** scrypt password hash. Server-only — never returned to the client. */
   passwordHash?: string;
+  /** True when the user must set a new password on their next login. */
+  mustChangePassword?: boolean;
 }
 
 export interface BranchAssignment {
@@ -153,6 +155,7 @@ export type ActiveView =
   | 'categories'
   | 'it_staff'
   | 'activity_logs'
+  | 'reports'
   | 'profile'
   | 'requirements';
 

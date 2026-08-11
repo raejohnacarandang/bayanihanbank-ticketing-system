@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   User,
@@ -9,10 +9,14 @@ import {
   TicketCategory,
   UserRole,
   Branch,
-  BranchAssignment
+  BranchAssignment,
+  NotificationItem
 } from './types';
 import { AdminTab, pathForView, parsePath } from './routes';
 import { storage } from './services/storageService';
+import { connectRealtime } from './services/realtime';
+import { browserNotification, playChime, primeAudio, requestNotificationPermission } from './services/notify';
+import { NotificationToasts, ToastItem } from './components/NotificationToasts';
 import type {
   CreateBranchParams,
   CreateUserParams,
@@ -24,6 +28,7 @@ import { PrototypeBanner } from './components/PrototypeBanner';
 import { RequirementStatusModal } from './components/RequirementStatusModal';
 import { GuidedDemoModal } from './components/GuidedDemoModal';
 import { LoginView } from './views/LoginView';
+import { ChangePasswordView } from './views/ChangePasswordView';
 import { BranchDashboardView } from './views/BranchDashboardView';
 import { CreateTicketView } from './views/CreateTicketView';
 import { TicketListView } from './views/TicketListView';
@@ -32,6 +37,7 @@ import { ItDashboardView } from './views/ItDashboardView';
 import { AdminDashboardView } from './views/AdminDashboardView';
 import { NotificationsView } from './views/NotificationsView';
 import { ProfileView } from './views/ProfileView';
+import { ReportsView } from './views/ReportsView';
 
 export default function App() {
   const navigate = useNavigate();
@@ -41,19 +47,60 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<User>(() => storage.getCurrentUser());
   const [allUsers, setAllUsers] = useState<User[]>(() => storage.getUsers());
   const [tickets, setTickets] = useState<Ticket[]>(() => storage.getTickets());
+  const [notifications, setNotifications] = useState<NotificationItem[]>(() =>
+    storage.getNotifications(storage.getCurrentUser().id)
+  );
   const [activeView, setActiveView] = useState<ActiveView>('dashboard');
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [adminTab, setAdminTab] = useState<AdminTab>('overview');
+  const [ticketStatusFilter, setTicketStatusFilter] = useState<string>('ALL');
 
   // Modals state
   const [showReqModal, setShowReqModal] = useState<boolean>(false);
   const [showDemoGuideModal, setShowDemoGuideModal] = useState<boolean>(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
 
+  // Notification popups
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const seenNotifIds = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    primeAudio();
+  }, []);
+
+  /** Open a ticket from a notification popup / toast. */
+  const openFromNotification = useCallback(
+    (notificationId: string, ticketId: string) => {
+      setToasts((prev) => prev.filter((t) => t.id !== notificationId));
+      setSelectedTicketId(ticketId);
+      setActiveView('ticket_detail');
+      navigate(pathForView('ticket_detail', undefined, ticketId));
+    },
+    [navigate]
+  );
+
+  /** Fire popups + sound for notifications the current session has not seen. */
+  const detectNewNotifications = useCallback(() => {
+    const user = storage.getCurrentUser();
+    if (!user?.id) return;
+    const fresh = storage.getNotifications(user.id).filter((n) => !seenNotifIds.current.has(n.id));
+    if (fresh.length === 0) return;
+    for (const n of fresh) seenNotifIds.current.add(n.id);
+    for (const n of fresh) {
+      setToasts((prev) => [...prev, { id: n.id, notification: n }]);
+      playChime();
+      browserNotification(n.title, n.message, () => openFromNotification(n.id, n.ticketId));
+      window.setTimeout(() => {
+        setToasts((prev) => prev.filter((t) => t.id !== n.id));
+      }, 7000);
+    }
+  }, [openFromNotification]);
+
   // Refresh dataset from the in-memory mirror
   const refreshData = useCallback(() => {
     setTickets(storage.getTickets());
     setAllUsers(storage.getUsers());
+    setNotifications(storage.getNotifications(storage.getCurrentUser().id));
   }, []);
 
   // Restore an existing session on mount
@@ -65,6 +112,9 @@ export default function App() {
         refreshData();
         setCurrentUser(storage.getCurrentUser());
         setIsLoggedIn(true);
+        seenNotifIds.current = new Set(
+          storage.getNotifications(storage.getCurrentUser().id).map((n) => n.id)
+        );
       } else {
         setIsLoggedIn(false);
       }
@@ -84,7 +134,7 @@ export default function App() {
       return;
     }
     setActiveView(parsed.view);
-    if (parsed.adminTab) setAdminTab(parsed.adminTab);
+    setAdminTab(parsed.adminTab ?? 'overview');
     if (parsed.ticketId) setSelectedTicketId(parsed.ticketId);
   }, [location.pathname]);
 
@@ -93,7 +143,10 @@ export default function App() {
     let active = true;
     const sync = async () => {
       await storage.refresh();
-      if (active) refreshData();
+      if (active) {
+        refreshData();
+        detectNewNotifications();
+      }
     };
     const interval = setInterval(() => void sync(), 30000);
     const onFocus = () => void sync();
@@ -108,7 +161,26 @@ export default function App() {
       window.removeEventListener('focus', onFocus);
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [refreshData]);
+  }, [refreshData, detectNewNotifications]);
+
+  // Real-time updates pushed by the server (SSE); polling remains as fallback.
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    let cancelled = false;
+    const handleRealtime = () => {
+      void storage.refresh().then(() => {
+        if (!cancelled) {
+          refreshData();
+          detectNewNotifications();
+        }
+      });
+    };
+    const disconnect = connectRealtime(handleRealtime);
+    return () => {
+      cancelled = true;
+      disconnect();
+    };
+  }, [isLoggedIn, refreshData, detectNewNotifications]);
 
   /** Navigate to a view, updating both state and the URL. */
   const go = useCallback(
@@ -118,7 +190,7 @@ export default function App() {
         return;
       }
       setActiveView(view);
-      if (opts?.adminTab) setAdminTab(opts.adminTab);
+      setAdminTab(opts?.adminTab ?? 'overview');
       if (opts?.ticketId) setSelectedTicketId(opts.ticketId);
       navigate(pathForView(view, opts?.adminTab, opts?.ticketId));
     },
@@ -131,6 +203,8 @@ export default function App() {
     setIsLoggedIn(true);
     setActiveView('dashboard');
     refreshData();
+    seenNotifIds.current = new Set(storage.getNotifications(user.id).map((n) => n.id));
+    requestNotificationPermission();
     navigate('/');
   };
 
@@ -140,11 +214,32 @@ export default function App() {
     navigate('/login');
   };
 
+  const handleChangePassword = async (currentPassword: string, newPassword: string) => {
+    const updated = await storage.changePassword(currentPassword, newPassword);
+    setCurrentUser(updated);
+    refreshData();
+    setActiveView('dashboard');
+    navigate('/');
+  };
+
+  const handleMarkAllRead = useCallback(async () => {
+    await storage.markAllNotificationsRead(currentUser.id);
+    refreshData();
+  }, [currentUser.id, refreshData]);
+
+  // Viewing the notification center clears the unread badge.
+  useEffect(() => {
+    if (activeView === 'notifications') {
+      void handleMarkAllRead();
+    }
+  }, [activeView, handleMarkAllRead]);
+
   const handleSwitchUser = async (user: User) => {
     try {
       const switched = await storage.impersonate(user);
       setCurrentUser(switched);
       refreshData();
+      seenNotifIds.current = new Set(storage.getNotifications(switched.id).map((n) => n.id));
       if (activeView !== 'ticket_detail') {
         go('dashboard');
       }
@@ -252,8 +347,7 @@ export default function App() {
   };
 
   // Unread notifications for header
-  const userNotifications = storage.getNotifications(currentUser.id);
-  const unreadCount = userNotifications.filter((n) => !n.read).length;
+  const unreadCount = notifications.filter((n) => !n.read).length;
 
   const myOpenTicketCount = tickets.filter(
     (t) =>
@@ -269,6 +363,16 @@ export default function App() {
 
   if (!isLoggedIn) {
     return <LoginView allUsers={allUsers} onLogin={handleLogin} />;
+  }
+
+  if (currentUser.mustChangePassword) {
+    return (
+      <ChangePasswordView
+        currentUser={currentUser}
+        onChangePassword={handleChangePassword}
+        onLogout={handleLogout}
+      />
+    );
   }
 
   const selectedTicket = selectedTicketId ? storage.getTicketById(selectedTicketId) : null;
@@ -290,16 +394,21 @@ export default function App() {
       <Header
         currentUser={currentUser}
         allUsers={allUsers}
-        notifications={userNotifications}
+        notifications={notifications}
         unreadCount={unreadCount}
         onSwitchUser={handleSwitchUser}
         onLogout={handleLogout}
-        onOpenNotifications={() => go('notifications')}
+        onOpenNotifications={() => {
+          go('notifications');
+          void handleMarkAllRead();
+        }}
+        onMarkAllRead={handleMarkAllRead}
         onMarkNotificationRead={async (id) => {
           await storage.markNotificationAsRead(id);
           refreshData();
         }}
         onNavigateTicket={(id) => handleNavigateTicketDetail(id)}
+        onNavigateProfile={() => go('profile')}
         onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
         isSidebarOpen={isSidebarOpen}
       />
@@ -309,7 +418,6 @@ export default function App() {
         {/* Role-Specific Navigation Sidebar */}
         <Sidebar
           currentUser={currentUser}
-          activeView={activeView}
           newTicketCount={newTicketCount}
           myOpenTicketCount={myOpenTicketCount}
           onNavigate={(view) => {
@@ -322,6 +430,7 @@ export default function App() {
             ) {
               go('users', { adminTab: view });
             } else {
+              if (view === 'all_tickets') setTicketStatusFilter('ALL');
               go(view);
             }
           }}
@@ -367,6 +476,10 @@ export default function App() {
                   onUpdateBranch={handleUpdateBranch}
                   onDeleteBranch={handleDeleteBranch}
                   onUpdateStaffAssignments={handleUpdateStaffAssignments}
+                  onViewStatusTickets={(status) => {
+                    setTicketStatusFilter(status);
+                    go('all_tickets');
+                  }}
                 />
               )}
               {currentUser.role === 'AUDITOR' && (
@@ -379,6 +492,10 @@ export default function App() {
                   tickets={tickets}
                   activeTab={adminTab}
                   onSelectTab={onAdminTabSelect}
+                  onViewStatusTickets={(status) => {
+                    setTicketStatusFilter(status);
+                    go('all_tickets');
+                  }}
                 />
               )}
             </>
@@ -419,6 +536,7 @@ export default function App() {
               title="Main IT Queue — All Tickets"
               subtitle="Comprehensive repository of IT tickets across all Bayanihan Bank branches"
               onNavigateTicketDetail={handleNavigateTicketDetail}
+              initialStatusFilter={ticketStatusFilter}
             />
           )}
 
@@ -495,10 +613,15 @@ export default function App() {
             />
           )}
 
+          {/* REPORTS VIEW */}
+          {activeView === 'reports' && (
+            <ReportsView tickets={tickets} branches={allBranches} categories={storage.getCategories()} users={allUsers} />
+          )}
+
           {/* NOTIFICATIONS VIEW */}
           {activeView === 'notifications' && (
             <NotificationsView
-              notifications={userNotifications}
+              notifications={notifications}
               onMarkRead={async (id) => {
                 await storage.markNotificationAsRead(id);
                 refreshData();
@@ -508,7 +631,9 @@ export default function App() {
           )}
 
           {/* PROFILE VIEW */}
-          {activeView === 'profile' && <ProfileView currentUser={currentUser} />}
+          {activeView === 'profile' && (
+            <ProfileView currentUser={currentUser} onChangePassword={handleChangePassword} />
+          )}
         </main>
       </div>
 
@@ -539,6 +664,13 @@ export default function App() {
             go(view as ActiveView);
           }
         }}
+      />
+
+      {/* Real-time notification popups */}
+      <NotificationToasts
+        toasts={toasts}
+        onDismiss={(id) => setToasts((prev) => prev.filter((t) => t.id !== id))}
+        onOpen={(notification) => openFromNotification(notification.id, notification.ticketId)}
       />
     </div>
   );

@@ -9,6 +9,7 @@
  * data (users, branches, categories, tickets, etc.) from ./data/initialData.
  */
 import mysql, { Pool, ResultSetHeader } from 'mysql2/promise';
+import { randomBytes } from 'crypto';
 import dotenv from 'dotenv';
 import {
   AppState,
@@ -73,6 +74,7 @@ const DDL: string[] = [
     email VARCHAR(200),
     avatarUrl VARCHAR(500),
     password_hash VARCHAR(200),
+    must_change_password TINYINT(1) DEFAULT 0,
     assignments JSON
   )`,
 
@@ -191,6 +193,12 @@ export async function initDatabase(): Promise<void> {
   } catch {
     // Column already exists.
   }
+  // Migration: add must_change_password column to pre-existing users tables.
+  try {
+    await pool.query('ALTER TABLE users ADD COLUMN must_change_password TINYINT(1) DEFAULT 0');
+  } catch {
+    // Column already exists.
+  }
   // Backfill: assign the demo password hash to any legacy account without one.
   await pool.query('UPDATE users SET password_hash = ? WHERE password_hash IS NULL', [
     hashPassword(DEFAULT_PASSWORD),
@@ -224,14 +232,34 @@ export async function seedIfEmpty(): Promise<void> {
   const seeded = await getMeta('seeded');
   if (seeded === '1') return;
 
+  const demoMode = process.env.DEMO_MODE !== 'false';
+
+  // In production (DEMO_MODE=false) we do NOT seed the demo accounts. Only a
+  // single bootstrap admin is created with a random one-time password that is
+  // printed to the server log; the password must be changed on first login.
+  const usersToSeed: Array<{ user: typeof INITIAL_USERS[number]; tempPassword?: string }> = demoMode
+    ? INITIAL_USERS.map((u) => ({ user: u }))
+    : [
+        {
+          user: INITIAL_USERS.find((u) => u.username === 'admin') ?? INITIAL_USERS[0],
+          tempPassword: randomBytes(9).toString('base64url'),
+        },
+      ];
+
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
 
-    for (const u of INITIAL_USERS) {
+    for (const { user: u, tempPassword } of usersToSeed) {
+      const password = tempPassword ?? DEFAULT_PASSWORD;
+      if (tempPassword) {
+        console.log(
+          `[mysql] Bootstrap account "${u.username}" created. One-time password (CHANGE ON FIRST LOGIN): ${tempPassword}`
+        );
+      }
       await conn.query(
-        'INSERT INTO users (id, username, name, role, branchId, branchName, department, email, avatarUrl, password_hash, assignments) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [u.id, u.username, u.name, u.role, u.branchId ?? null, u.branchName ?? null, u.department ?? null, u.email ?? null, u.avatarUrl ?? null, hashPassword(DEFAULT_PASSWORD), u.assignments ? JSON.stringify(u.assignments) : null]
+        'INSERT INTO users (id, username, name, role, branchId, branchName, department, email, avatarUrl, password_hash, must_change_password, assignments) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [u.id, u.username, u.name, u.role, u.branchId ?? null, u.branchName ?? null, u.department ?? null, u.email ?? null, u.avatarUrl ?? null, hashPassword(password), demoMode ? 0 : 1, u.assignments ? JSON.stringify(u.assignments) : null]
       );
     }
 
@@ -283,7 +311,7 @@ export async function seedIfEmpty(): Promise<void> {
 
     await conn.query(
       'INSERT INTO app_meta (meta_key, meta_value) VALUES (?, ?), (?, ?)',
-      ['seeded', '1', 'currentUserId', INITIAL_USERS[0].id]
+      ['seeded', '1', 'currentUserId', usersToSeed[0].user.id]
     );
 
     await conn.commit();
@@ -343,7 +371,7 @@ async function loadRows<T>(table: string): Promise<T[]> {
 export async function loadState(): Promise<AppState> {
   const [users, branches, categories, tickets, comments, timeline, notifications, auditLogs] =
     await Promise.all([
-      loadRows<User & { assignments?: string | null; password_hash?: string | null }>('users'),
+      loadRows<User & { assignments?: string | null; password_hash?: string | null; must_change_password?: number | boolean }>('users'),
       loadRows<Branch>('branches'),
       loadRows<CategoryInfo>('categories'),
       loadRows<Ticket & { attachments?: string | null }>('tickets'),
@@ -364,6 +392,7 @@ export async function loadState(): Promise<AppState> {
           : (u.assignments as BranchAssignment[]))
       : undefined,
     passwordHash: u.password_hash ?? undefined,
+    mustChangePassword: toBool(u.must_change_password),
   }));
 
   const parsedTickets: Ticket[] = tickets.map((t) => ({
@@ -419,8 +448,8 @@ export async function saveState(state: AppState): Promise<void> {
 
     for (const u of state.users) {
       await conn.query(
-        'INSERT INTO users (id, username, name, role, branchId, branchName, department, email, avatarUrl, assignments) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [u.id, u.username, u.name, u.role, u.branchId ?? null, u.branchName ?? null, u.department ?? null, u.email ?? null, u.avatarUrl ?? null, u.assignments ? JSON.stringify(u.assignments) : null]
+        'INSERT INTO users (id, username, name, role, branchId, branchName, department, email, avatarUrl, must_change_password, assignments) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [u.id, u.username, u.name, u.role, u.branchId ?? null, u.branchName ?? null, u.department ?? null, u.email ?? null, u.avatarUrl ?? null, u.mustChangePassword ? 1 : 0, u.assignments ? JSON.stringify(u.assignments) : null]
       );
     }
 
@@ -495,15 +524,16 @@ const rowsEqual = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSO
 
 async function upsertUserRow(conn: Queryable, u: User): Promise<void> {
   await conn.query(
-    `INSERT INTO users (id, username, name, role, branchId, branchName, department, email, avatarUrl, password_hash, assignments)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO users (id, username, name, role, branchId, branchName, department, email, avatarUrl, password_hash, must_change_password, assignments)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE
        username = VALUES(username), name = VALUES(name), role = VALUES(role),
        branchId = VALUES(branchId), branchName = VALUES(branchName),
        department = VALUES(department), email = VALUES(email),
        avatarUrl = VALUES(avatarUrl), password_hash = VALUES(password_hash),
+       must_change_password = VALUES(must_change_password),
        assignments = VALUES(assignments)`,
-    [u.id, u.username, u.name, u.role, u.branchId ?? null, u.branchName ?? null, u.department ?? null, u.email ?? null, u.avatarUrl ?? null, u.passwordHash ?? null, u.assignments ? JSON.stringify(u.assignments) : null]
+    [u.id, u.username, u.name, u.role, u.branchId ?? null, u.branchName ?? null, u.department ?? null, u.email ?? null, u.avatarUrl ?? null, u.passwordHash ?? null, u.mustChangePassword ? 1 : 0, u.assignments ? JSON.stringify(u.assignments) : null]
   );
 }
 

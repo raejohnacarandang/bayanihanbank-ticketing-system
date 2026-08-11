@@ -34,6 +34,8 @@ export function pathForView(view: ActiveView, adminTab?: AdminTab, ticketId?: st
       return ticketId ? `/tickets/${encodeURIComponent(ticketId)}` : '/tickets';
     case 'notifications':
       return '/notifications';
+    case 'reports':
+      return '/reports';
     case 'users':
       return adminTab && adminTab !== 'overview' ? ADMIN_TAB_PATH[adminTab] : '/admin';
     case 'branches':
@@ -69,6 +71,8 @@ export function parsePath(pathname: string): ParsedPath | null {
       return null;
     case 'notifications':
       return { view: 'notifications' };
+    case 'reports':
+      return { view: 'reports' };
     case 'profile':
       return { view: 'profile' };
     case 'requirements':
@@ -91,9 +95,16 @@ export function parsePath(pathname: string): ParsedPath | null {
       }
     }
     case 'admin': {
-      const tab = parts[1] as AdminTab | undefined;
-      if (tab && (tab === 'users' || tab === 'branches' || tab === 'categories' || tab === 'it_staff' || tab === 'activity_logs')) {
-        return { view: 'users', adminTab: tab };
+      const seg = parts[1];
+      const adminSegments: Record<string, AdminTab> = {
+        users: 'users',
+        branches: 'branches',
+        categories: 'categories',
+        'it-staff': 'it_staff',
+        'activity-logs': 'activity_logs',
+      };
+      if (seg && adminSegments[seg]) {
+        return { view: 'users', adminTab: adminSegments[seg] };
       }
       return { view: 'users', adminTab: 'overview' };
     }

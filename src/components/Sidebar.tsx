@@ -1,5 +1,7 @@
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 import { User, ActiveView } from '../types';
+import { parsePath } from '../routes';
 import { BayanihanLogo } from './BayanihanLogo';
 import {
   LayoutDashboard,
@@ -18,12 +20,12 @@ import {
   FileCheck,
   Sliders,
   ChevronRight,
-  LogOut
+  LogOut,
+  BarChart3
 } from 'lucide-react';
 
 interface SidebarProps {
   currentUser: User;
-  activeView: ActiveView;
   newTicketCount: number;
   myOpenTicketCount: number;
   onNavigate: (view: ActiveView) => void;
@@ -34,7 +36,6 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({
   currentUser,
-  activeView,
   newTicketCount,
   myOpenTicketCount,
   onNavigate,
@@ -42,13 +43,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isOpen,
   onCloseMobile,
 }) => {
+  const location = useLocation();
+  const parsed = parsePath(location.pathname);
+  const activeView = parsed?.view ?? 'dashboard';
+  const adminTab = parsed?.adminTab;
+
   const isBranchUser = currentUser.role === 'BRANCH_USER';
   const isITStaff = currentUser.role === 'IT_STAFF';
   const isAdmin = currentUser.role === 'ADMINISTRATOR';
   const isAuditor = currentUser.role === 'AUDITOR';
 
+  const adminViews: ActiveView[] = ['users', 'it_staff', 'branches', 'categories', 'activity_logs'];
+
   const navItemClass = (view: ActiveView) => {
-    const isActive = activeView === view;
+    const isActive =
+      activeView === 'users' && adminViews.includes(view)
+        ? adminTab === view || (view === 'users' && adminTab === 'overview')
+        : activeView === view;
     return `w-full flex items-center justify-between px-4 py-3 rounded-lg text-sm font-semibold transition-colors cursor-pointer ${
       isActive
         ? 'bg-emerald-800 text-amber-300 shadow-sm border border-emerald-700/60'
@@ -283,6 +294,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <span>Audit Activity Logs</span>
                   </div>
                 </button>
+
+                <button
+                  onClick={() => {
+                    onNavigate('reports');
+                    onCloseMobile();
+                  }}
+                  className={navItemClass('reports')}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <BarChart3 className="w-4 h-4 text-blue-400" />
+                    <span>Reports & Analytics</span>
+                  </div>
+                </button>
               </>
             )}
 
@@ -315,6 +339,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <div className="flex items-center gap-2.5">
                     <History className="w-4 h-4 text-teal-400" />
                     <span>Audit Activity Logs</span>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => {
+                    onNavigate('reports');
+                    onCloseMobile();
+                  }}
+                  className={navItemClass('reports')}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <BarChart3 className="w-4 h-4 text-blue-400" />
+                    <span>Reports & Analytics</span>
                   </div>
                 </button>
               </>

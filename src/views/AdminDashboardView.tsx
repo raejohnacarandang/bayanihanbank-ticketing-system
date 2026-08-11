@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, Branch, CategoryInfo, AuditLog, Ticket, UserRole, BranchAssignment } from '../types';
+import { User, Branch, CategoryInfo, AuditLog, Ticket, TicketStatus, UserRole, BranchAssignment } from '../types';
 import type { CreateBranchParams, CreateUserParams, UpdateUserChanges } from '../services/store';
 import {
   Users,
@@ -17,7 +17,17 @@ import {
   X,
   AlertTriangle,
   MapPin,
-  CalendarClock
+  CalendarClock,
+  AlertCircle,
+  PlayCircle,
+  Clock,
+  Archive,
+  RotateCcw,
+  Ban,
+  BarChart3,
+  Eye,
+  EyeOff,
+  type LucideIcon
 } from 'lucide-react';
 
 type AdminTab = 'overview' | 'users' | 'branches' | 'categories' | 'it_staff' | 'activity_logs';
@@ -38,6 +48,7 @@ interface AdminDashboardViewProps {
   onUpdateBranch?: (branchId: string, changes: Partial<Branch>) => void;
   onDeleteBranch?: (branchId: string) => void;
   onUpdateStaffAssignments?: (staffUserId: string, assignments: BranchAssignment[]) => void;
+  onViewStatusTickets?: (status: TicketStatus) => void;
 }
 
 interface UserFormState {
@@ -49,6 +60,7 @@ interface UserFormState {
   branchId?: string;
   branchName?: string;
   department?: string;
+  password?: string;
 }
 
 interface BranchFormState {
@@ -76,7 +88,6 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
   auditLogs,
   tickets,
   activeTab,
-  onSelectTab,
   mode = 'admin',
   onCreateUser,
   onUpdateUser,
@@ -85,6 +96,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
   onUpdateBranch,
   onDeleteBranch,
   onUpdateStaffAssignments,
+  onViewStatusTickets,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [userModal, setUserModal] = useState<{ mode: 'create' | 'edit'; user?: User } | null>(null);
@@ -102,6 +114,18 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
   const openTickets = tickets.filter((t) => t.status !== 'Closed' && t.status !== 'Cancelled').length;
   const resolvedTickets = tickets.filter((t) => t.status === 'Resolved' || t.status === 'Closed').length;
 
+  const STATUS_DEFS: { status: TicketStatus; label: string; icon: LucideIcon; cardClass: string; barClass: string; countClass: string }[] = [
+    { status: 'New', label: 'New', icon: AlertCircle, cardClass: 'bg-blue-50 border-blue-200', barClass: 'bg-blue-600', countClass: 'text-blue-900' },
+    { status: 'Assigned', label: 'Assigned', icon: UserCheck, cardClass: 'bg-indigo-50 border-indigo-200', barClass: 'bg-indigo-600', countClass: 'text-indigo-900' },
+    { status: 'In Progress', label: 'In Progress', icon: PlayCircle, cardClass: 'bg-amber-50 border-amber-200', barClass: 'bg-amber-500', countClass: 'text-amber-900' },
+    { status: 'Pending', label: 'Pending', icon: Clock, cardClass: 'bg-purple-50 border-purple-200', barClass: 'bg-purple-600', countClass: 'text-purple-900' },
+    { status: 'Resolved', label: 'Resolved', icon: CheckCircle2, cardClass: 'bg-emerald-50 border-emerald-200', barClass: 'bg-emerald-600', countClass: 'text-emerald-900' },
+    { status: 'Closed', label: 'Closed', icon: Archive, cardClass: 'bg-slate-100 border-slate-200', barClass: 'bg-slate-500', countClass: 'text-slate-700' },
+    { status: 'Reopened', label: 'Reopened', icon: RotateCcw, cardClass: 'bg-orange-50 border-orange-200', barClass: 'bg-orange-500', countClass: 'text-orange-900' },
+    { status: 'Cancelled', label: 'Cancelled', icon: Ban, cardClass: 'bg-red-50 border-red-200', barClass: 'bg-red-500', countClass: 'text-red-900' },
+  ];
+  const statusCount = (s: TicketStatus) => tickets.filter((t) => t.status === s).length;
+
   const itStaff = users.filter((u) => u.role === 'IT_STAFF');
 
   const branchById = (id?: string): Branch | undefined => branches.find((b) => b.id === id);
@@ -116,6 +140,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
         branchId: form.role === 'BRANCH_USER' ? form.branchId : undefined,
         branchName: form.role === 'BRANCH_USER' ? form.branchName : undefined,
         department: form.role === 'BRANCH_USER' ? undefined : form.department,
+        password: form.password || undefined,
       });
     } else {
       onCreateUser?.({
@@ -126,6 +151,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
         branchId: form.role === 'BRANCH_USER' ? form.branchId : undefined,
         branchName: form.role === 'BRANCH_USER' ? form.branchName : undefined,
         department: form.role === 'BRANCH_USER' ? undefined : form.department,
+        password: form.password || undefined,
       });
     }
     setUserModal(null);
@@ -159,14 +185,6 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
     setDeleteTarget(null);
   };
 
-  const tabClass = (tab: AdminTab) => {
-    const active = activeTab === tab;
-    const accent = isAuditor ? 'bg-teal-600' : 'bg-purple-600';
-    return `px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-      active ? `${accent} text-white` : 'text-slate-300 hover:text-white'
-    }`;
-  };
-
   return (
     <div className="space-y-6">
       {/* Admin Header */}
@@ -188,36 +206,6 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
               ? 'Read-only monitoring of tickets and audit activity for the Internal Audit Department'
               : 'Manage users, branches, IT staff, and review system audit activity'}
           </p>
-        </div>
-
-        {/* Tab Navigation Controls */}
-        <div className="flex flex-wrap items-center gap-1.5 bg-slate-800 p-1.5 rounded-xl border border-slate-700">
-          <button onClick={() => onSelectTab('overview')} className={tabClass('overview')}>
-            Overview
-          </button>
-          {!isAuditor && (
-            <button onClick={() => onSelectTab('users')} className={tabClass('users')}>
-              Users ({users.length})
-            </button>
-          )}
-          {!isAuditor && (
-            <button onClick={() => onSelectTab('it_staff')} className={tabClass('it_staff')}>
-              IT Staff ({itStaff.length})
-            </button>
-          )}
-          {!isAuditor && (
-            <button onClick={() => onSelectTab('branches')} className={tabClass('branches')}>
-              Branches ({branches.length})
-            </button>
-          )}
-          {!isAuditor && (
-            <button onClick={() => onSelectTab('categories')} className={tabClass('categories')}>
-              Categories ({categories.length})
-            </button>
-          )}
-          <button onClick={() => onSelectTab('activity_logs')} className={tabClass('activity_logs')}>
-            Audit Logs
-          </button>
         </div>
       </div>
 
@@ -248,6 +236,51 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
             <div className="bg-white p-4 rounded-xl border border-slate-200">
               <span className="text-[10px] font-bold text-emerald-700 uppercase">Resolved</span>
               <div className="text-2xl font-black text-emerald-900 mt-1">{resolvedTickets}</div>
+            </div>
+          </div>
+
+          {/* Ticket Status Breakdown */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-4 sm:p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-slate-50/60">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4 text-purple-600" />
+                  <span>Ticket Status Breakdown</span>
+                </h3>
+                <p className="text-xs text-slate-500">Distribution of tickets by current status</p>
+              </div>
+              <span className="text-xs text-slate-500 font-mono">{totalTickets} tickets total</span>
+            </div>
+            <div className="p-4 sm:p-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              {STATUS_DEFS.map((s) => {
+                const count = statusCount(s.status);
+                const pct = totalTickets > 0 ? Math.round((count / totalTickets) * 100) : 0;
+                const Icon = s.icon;
+                return (
+                  <div
+                    key={s.status}
+                    onClick={() => onViewStatusTickets?.(s.status)}
+                    className={`p-4 rounded-xl border ${s.cardClass} ${
+                      onViewStatusTickets ? 'cursor-pointer hover:ring-2 hover:ring-purple-300 transition' : ''
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600">
+                        {s.label}
+                      </span>
+                      <Icon className="w-3.5 h-3.5 text-slate-500" />
+                    </div>
+                    <div className={`text-2xl font-black mt-1 ${s.countClass}`}>{count}</div>
+                    <div className="text-[10px] text-slate-500 font-semibold">{pct}% of total</div>
+                    <div className="mt-2 h-1.5 rounded-full bg-white/70 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${s.barClass}`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -680,9 +713,11 @@ function UserFormModal({
     branchId: initial?.branchId || branches[0]?.id,
     branchName: initial?.branchName || (branches[0] ? branches[0].name : ''),
     department: initial?.department || '',
+    password: '',
   }));
 
   const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleBranchChange = (branchId: string) => {
     const b = branches.find((x) => x.id === branchId);
@@ -697,6 +732,10 @@ function UserFormModal({
     }
     if (form.role === 'BRANCH_USER' && !form.branchId) {
       setError('Please select a branch for this user.');
+      return;
+    }
+    if (form.password && form.password.length < 6) {
+      setError('Password must be at least 6 characters long.');
       return;
     }
     onSubmit(form);
@@ -793,6 +832,34 @@ function UserFormModal({
                 placeholder="e.g. maria.santos@bayanihanbank.demo"
                 className={inputClass}
               />
+            </div>
+
+            <div className="col-span-2">
+              <label className={labelClass}>
+                {isEdit ? 'New Password (leave blank to keep current)' : 'Initial Password'}
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={form.password}
+                  onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+                  placeholder={isEdit ? '••••••••' : `Default: password123 (min 6 chars)`}
+                  className={`${inputClass} pr-10`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-slate-200 text-slate-500 cursor-pointer"
+                  title={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                {isEdit
+                  ? 'Setting a new password forces the user to change it on their next login.'
+                  : 'If left blank, the default password is password123. The user must change it on first login.'}
+              </p>
             </div>
           </div>
 

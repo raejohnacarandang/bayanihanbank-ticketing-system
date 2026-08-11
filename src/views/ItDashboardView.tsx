@@ -33,6 +33,7 @@ export const ItDashboardView: React.FC<ItDashboardViewProps> = ({
   onNavigateAllTickets,
 }) => {
   const [branchFilter, setBranchFilter] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState('ALL');
 
   const totalCount = tickets.length;
   const newCount = tickets.filter((t) => t.status === 'New').length;
@@ -50,7 +51,12 @@ export const ItDashboardView: React.FC<ItDashboardViewProps> = ({
   const attentionTickets = tickets.filter((t) => {
     const isUnclosed = t.status !== 'Closed' && t.status !== 'Cancelled';
     const matchesBranch = branchFilter === 'ALL' || t.branchName === branchFilter;
-    return isUnclosed && matchesBranch;
+    const matchesStatus =
+      statusFilter === 'ALL' ||
+      (statusFilter === 'CRITICAL' && t.priority === 'Critical') ||
+      (statusFilter === 'SLA_BREACHED' && slaStatusFor(t) === 'breached') ||
+      t.status === statusFilter;
+    return isUnclosed && matchesBranch && matchesStatus;
   });
 
   return (
@@ -81,68 +87,138 @@ export const ItDashboardView: React.FC<ItDashboardViewProps> = ({
 
       {/* Metric Cards Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-8 gap-3">
-        <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs">
+        <div
+          onClick={() => setStatusFilter('ALL')}
+          className={`p-3.5 rounded-xl border transition cursor-pointer ${
+            statusFilter === 'ALL'
+              ? 'bg-slate-900 text-white border-slate-800 shadow-md ring-2 ring-blue-500'
+              : 'bg-white border-slate-200 shadow-2xs'
+          }`}
+        >
           <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 flex items-center justify-between">
             <span>Total</span>
-            <TicketIcon className="w-3.5 h-3.5 text-slate-400" />
+            <TicketIcon className={`w-3.5 h-3.5 ${statusFilter === 'ALL' ? 'text-blue-300' : 'text-slate-400'}`} />
           </div>
-          <div className="text-2xl font-black text-slate-900 mt-1">{totalCount}</div>
+          <div className="text-2xl font-black mt-1">{totalCount}</div>
         </div>
 
-        <div className="bg-blue-50/70 p-3.5 rounded-xl border border-blue-200 shadow-2xs">
-          <div className="text-[10px] font-bold uppercase tracking-wider text-blue-700 flex items-center justify-between">
+        <div
+          onClick={() => setStatusFilter('New')}
+          className={`p-3.5 rounded-xl border transition cursor-pointer ${
+            statusFilter === 'New'
+              ? 'bg-blue-900 text-white border-blue-800 shadow-md ring-2 ring-blue-400'
+              : 'bg-blue-50/70 border-blue-200 shadow-2xs'
+          }`}
+        >
+          <div className={`text-[10px] font-bold uppercase tracking-wider flex items-center justify-between ${
+            statusFilter === 'New' ? 'text-blue-300' : 'text-blue-700'
+          }`}>
             <span>New</span>
-            <AlertCircle className="w-3.5 h-3.5 text-blue-600" />
+            <AlertCircle className={`w-3.5 h-3.5 ${statusFilter === 'New' ? 'text-blue-300' : 'text-blue-600'}`} />
           </div>
-          <div className="text-2xl font-black text-blue-900 mt-1">{newCount}</div>
+          <div className={`text-2xl font-black mt-1 ${statusFilter === 'New' ? 'text-blue-50' : 'text-blue-900'}`}>{newCount}</div>
         </div>
 
-        <div className="bg-indigo-50/70 p-3.5 rounded-xl border border-indigo-200 shadow-2xs">
-          <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 flex items-center justify-between">
+        <div
+          onClick={() => setStatusFilter('Assigned')}
+          className={`p-3.5 rounded-xl border transition cursor-pointer ${
+            statusFilter === 'Assigned'
+              ? 'bg-indigo-900 text-white border-indigo-800 shadow-md ring-2 ring-indigo-400'
+              : 'bg-indigo-50/70 border-indigo-200 shadow-2xs'
+          }`}
+        >
+          <div className={`text-[10px] font-bold uppercase tracking-wider flex items-center justify-between ${
+            statusFilter === 'Assigned' ? 'text-indigo-300' : 'text-indigo-700'
+          }`}>
             <span>Assigned</span>
-            <UserCheck className="w-3.5 h-3.5 text-indigo-600" />
+            <UserCheck className={`w-3.5 h-3.5 ${statusFilter === 'Assigned' ? 'text-indigo-300' : 'text-indigo-600'}`} />
           </div>
-          <div className="text-2xl font-black text-indigo-900 mt-1">{assignedCount}</div>
+          <div className={`text-2xl font-black mt-1 ${statusFilter === 'Assigned' ? 'text-indigo-50' : 'text-indigo-900'}`}>{assignedCount}</div>
         </div>
 
-        <div className="bg-amber-50/70 p-3.5 rounded-xl border border-amber-200 shadow-2xs">
-          <div className="text-[10px] font-bold uppercase tracking-wider text-amber-800 flex items-center justify-between">
+        <div
+          onClick={() => setStatusFilter('In Progress')}
+          className={`p-3.5 rounded-xl border transition cursor-pointer ${
+            statusFilter === 'In Progress'
+              ? 'bg-amber-900 text-white border-amber-800 shadow-md ring-2 ring-amber-400'
+              : 'bg-amber-50/70 border-amber-200 shadow-2xs'
+          }`}
+        >
+          <div className={`text-[10px] font-bold uppercase tracking-wider flex items-center justify-between ${
+            statusFilter === 'In Progress' ? 'text-amber-300' : 'text-amber-800'
+          }`}>
             <span>In Progress</span>
-            <PlayCircle className="w-3.5 h-3.5 text-amber-600" />
+            <PlayCircle className={`w-3.5 h-3.5 ${statusFilter === 'In Progress' ? 'text-amber-300' : 'text-amber-600'}`} />
           </div>
-          <div className="text-2xl font-black text-amber-900 mt-1">{inProgressCount}</div>
+          <div className={`text-2xl font-black mt-1 ${statusFilter === 'In Progress' ? 'text-amber-50' : 'text-amber-900'}`}>{inProgressCount}</div>
         </div>
 
-        <div className="bg-purple-50/70 p-3.5 rounded-xl border border-purple-200 shadow-2xs">
-          <div className="text-[10px] font-bold uppercase tracking-wider text-purple-700 flex items-center justify-between">
+        <div
+          onClick={() => setStatusFilter('Pending')}
+          className={`p-3.5 rounded-xl border transition cursor-pointer ${
+            statusFilter === 'Pending'
+              ? 'bg-purple-900 text-white border-purple-800 shadow-md ring-2 ring-purple-400'
+              : 'bg-purple-50/70 border-purple-200 shadow-2xs'
+          }`}
+        >
+          <div className={`text-[10px] font-bold uppercase tracking-wider flex items-center justify-between ${
+            statusFilter === 'Pending' ? 'text-purple-300' : 'text-purple-700'
+          }`}>
             <span>Pending</span>
-            <Clock className="w-3.5 h-3.5 text-purple-600" />
+            <Clock className={`w-3.5 h-3.5 ${statusFilter === 'Pending' ? 'text-purple-300' : 'text-purple-600'}`} />
           </div>
-          <div className="text-2xl font-black text-purple-900 mt-1">{pendingCount}</div>
+          <div className={`text-2xl font-black mt-1 ${statusFilter === 'Pending' ? 'text-purple-50' : 'text-purple-900'}`}>{pendingCount}</div>
         </div>
 
-        <div className="bg-emerald-50/70 p-3.5 rounded-xl border border-emerald-200 shadow-2xs">
-          <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 flex items-center justify-between">
+        <div
+          onClick={() => setStatusFilter('Resolved')}
+          className={`p-3.5 rounded-xl border transition cursor-pointer ${
+            statusFilter === 'Resolved'
+              ? 'bg-emerald-900 text-white border-emerald-800 shadow-md ring-2 ring-emerald-400'
+              : 'bg-emerald-50/70 border-emerald-200 shadow-2xs'
+          }`}
+        >
+          <div className={`text-[10px] font-bold uppercase tracking-wider flex items-center justify-between ${
+            statusFilter === 'Resolved' ? 'text-emerald-300' : 'text-emerald-700'
+          }`}>
             <span>Resolved</span>
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+            <CheckCircle2 className={`w-3.5 h-3.5 ${statusFilter === 'Resolved' ? 'text-emerald-300' : 'text-emerald-600'}`} />
           </div>
-          <div className="text-2xl font-black text-emerald-900 mt-1">{resolvedCount}</div>
+          <div className={`text-2xl font-black mt-1 ${statusFilter === 'Resolved' ? 'text-emerald-50' : 'text-emerald-900'}`}>{resolvedCount}</div>
         </div>
 
-        <div className="bg-red-50/70 p-3.5 rounded-xl border border-red-200 shadow-2xs">
-          <div className="text-[10px] font-bold uppercase tracking-wider text-red-700 flex items-center justify-between">
+        <div
+          onClick={() => setStatusFilter('CRITICAL')}
+          className={`p-3.5 rounded-xl border transition cursor-pointer ${
+            statusFilter === 'CRITICAL'
+              ? 'bg-red-900 text-white border-red-800 shadow-md ring-2 ring-red-400'
+              : 'bg-red-50/70 border-red-200 shadow-2xs'
+          }`}
+        >
+          <div className={`text-[10px] font-bold uppercase tracking-wider flex items-center justify-between ${
+            statusFilter === 'CRITICAL' ? 'text-red-300' : 'text-red-700'
+          }`}>
             <span>Critical</span>
-            <ShieldAlert className="w-3.5 h-3.5 text-red-600" />
+            <ShieldAlert className={`w-3.5 h-3.5 ${statusFilter === 'CRITICAL' ? 'text-red-300' : 'text-red-600'}`} />
           </div>
-          <div className="text-2xl font-black text-red-900 mt-1">{criticalCount}</div>
+          <div className={`text-2xl font-black mt-1 ${statusFilter === 'CRITICAL' ? 'text-red-50' : 'text-red-900'}`}>{criticalCount}</div>
         </div>
 
-        <div className={`p-3.5 rounded-xl border shadow-2xs ${slaBreachedCount > 0 ? 'bg-red-100/80 border-red-300' : 'bg-slate-50/70 border-slate-200'}`}>
-          <div className="text-[10px] font-bold uppercase tracking-wider text-red-700 flex items-center justify-between">
+        <div
+          onClick={() => setStatusFilter('SLA_BREACHED')}
+          className={`p-3.5 rounded-xl border transition cursor-pointer ${
+            statusFilter === 'SLA_BREACHED'
+              ? 'bg-red-900 text-white border-red-800 shadow-md ring-2 ring-red-400'
+              : slaBreachedCount > 0 ? 'bg-red-100/80 border-red-300' : 'bg-slate-50/70 border-slate-200'
+          }`}
+        >
+          <div className={`text-[10px] font-bold uppercase tracking-wider flex items-center justify-between ${
+            statusFilter === 'SLA_BREACHED' ? 'text-red-300' : 'text-red-700'
+          }`}>
             <span>SLA Breached</span>
-            <AlarmClockOff className="w-3.5 h-3.5 text-red-600" />
+            <AlarmClockOff className={`w-3.5 h-3.5 ${statusFilter === 'SLA_BREACHED' ? 'text-red-300' : 'text-red-600'}`} />
           </div>
-          <div className={`text-2xl font-black mt-1 ${slaBreachedCount > 0 ? 'text-red-900' : 'text-slate-500'}`}>{slaBreachedCount}</div>
+          <div className={`text-2xl font-black mt-1 ${statusFilter === 'SLA_BREACHED' ? 'text-red-50' : slaBreachedCount > 0 ? 'text-red-900' : 'text-slate-500'}`}>{slaBreachedCount}</div>
         </div>
       </div>
 

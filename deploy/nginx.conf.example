@@ -1,0 +1,47 @@
+# nginx reverse proxy + HTTPS for the Bayanihan Bank IT Service Desk.
+#
+# The app serves on port 3001 over plain HTTP; nginx terminates TLS and proxies
+# to it. Steps:
+#   1. Point `server_name` to your real domain (e.g. servicedesk.bayanihanbank.ph).
+#   2. Install certbot and run `certbot --nginx` to get a Let's Encrypt cert.
+#   3. Place this file in /etc/nginx/conf.d/servicedesk.conf and reload nginx.
+#
+# Windows note: this config is for a Linux nginx reverse proxy in front of the
+# Node app (which can still run on Windows).
+
+# HTTP -> HTTPS redirect
+server {
+    listen 80;
+    server_name servicedesk.bayanihanbank.ph;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    server_name servicedesk.bayanihanbank.ph;
+
+    ssl_certificate     /etc/letsencrypt/live/servicedesk.bayanihanbank.ph/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/servicedesk.bayanihanbank.ph/privkey.pem;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+
+    # 200 MB upload limit for ticket attachments
+    client_max_body_size 200m;
+
+    location / {
+        proxy_pass http://127.0.0.1:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}

@@ -36,6 +36,7 @@ export const BranchDashboardView: React.FC<BranchDashboardViewProps> = ({
     const matchesStatus =
       selectedStatusFilter === 'ALL' ||
       (selectedStatusFilter === 'OPEN' && t.status !== 'Closed' && t.status !== 'Cancelled') ||
+      (selectedStatusFilter === 'SLA_BREACHED' && slaStatusFor(t) === 'breached') ||
       t.status === selectedStatusFilter;
 
     const matchesSearch =
@@ -48,7 +49,13 @@ export const BranchDashboardView: React.FC<BranchDashboardViewProps> = ({
   });
 
   const getGreetingTime = () => {
-    const hour = new Date().getHours();
+    const hour = Number(
+      new Intl.DateTimeFormat('en-US', {
+        hour: '2-digit',
+        hourCycle: 'h23',
+        timeZone: 'Asia/Manila',
+      }).format(new Date())
+    );
     if (hour < 12) return 'Good morning';
     if (hour < 18) return 'Good afternoon';
     return 'Good evening';
@@ -92,12 +99,14 @@ export const BranchDashboardView: React.FC<BranchDashboardViewProps> = ({
               : 'bg-white text-slate-900 border-slate-200 hover:border-slate-300'
           }`}
         >
-          <div className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
+          <div className={`text-xs font-bold uppercase tracking-wider flex items-center justify-between ${
+            selectedStatusFilter === 'ALL' ? 'text-slate-300' : 'text-slate-400'
+          }`}>
             <span>Total Tickets</span>
-            <TicketIcon className="w-4 h-4 text-blue-500" />
+            <TicketIcon className={`w-4 h-4 ${selectedStatusFilter === 'ALL' ? 'text-blue-300' : 'text-blue-500'}`} />
           </div>
           <div className="text-2xl sm:text-3xl font-black mt-2">{totalCount}</div>
-          <div className="text-[11px] text-slate-500 mt-1">Submitted from branch</div>
+          <div className={`text-[11px] mt-1 ${selectedStatusFilter === 'ALL' ? 'text-slate-400' : 'text-slate-500'}`}>Submitted from branch</div>
         </div>
 
         <div
@@ -108,12 +117,16 @@ export const BranchDashboardView: React.FC<BranchDashboardViewProps> = ({
               : 'bg-white text-slate-900 border-slate-200 hover:border-blue-200'
           }`}
         >
-          <div className="text-xs font-bold uppercase tracking-wider text-blue-600 flex items-center justify-between">
+          <div className={`text-xs font-bold uppercase tracking-wider flex items-center justify-between ${
+            selectedStatusFilter === 'New' ? 'text-blue-300' : 'text-blue-600'
+          }`}>
             <span>New</span>
-            <AlertCircle className="w-4 h-4 text-blue-500" />
+            <AlertCircle className={`w-4 h-4 ${selectedStatusFilter === 'New' ? 'text-blue-300' : 'text-blue-500'}`} />
           </div>
-          <div className="text-2xl sm:text-3xl font-black text-blue-900 mt-2">{newCount}</div>
-          <div className="text-[11px] text-slate-500 mt-1">Awaiting IT triage</div>
+          <div className={`text-2xl sm:text-3xl font-black mt-2 ${
+            selectedStatusFilter === 'New' ? 'text-blue-50' : 'text-blue-900'
+          }`}>{newCount}</div>
+          <div className={`text-[11px] mt-1 ${selectedStatusFilter === 'New' ? 'text-blue-200' : 'text-slate-500'}`}>Awaiting IT triage</div>
         </div>
 
         <div
@@ -124,12 +137,16 @@ export const BranchDashboardView: React.FC<BranchDashboardViewProps> = ({
               : 'bg-white text-slate-900 border-slate-200 hover:border-amber-200'
           }`}
         >
-          <div className="text-xs font-bold uppercase tracking-wider text-amber-700 flex items-center justify-between">
+          <div className={`text-xs font-bold uppercase tracking-wider flex items-center justify-between ${
+            selectedStatusFilter === 'In Progress' ? 'text-amber-300' : 'text-amber-700'
+          }`}>
             <span>In Progress</span>
-            <PlayCircle className="w-4 h-4 text-amber-600" />
+            <PlayCircle className={`w-4 h-4 ${selectedStatusFilter === 'In Progress' ? 'text-amber-300' : 'text-amber-600'}`} />
           </div>
-          <div className="text-2xl sm:text-3xl font-black text-amber-900 mt-2">{inProgressCount}</div>
-          <div className="text-[11px] text-slate-500 mt-1">Under IT resolution</div>
+          <div className={`text-2xl sm:text-3xl font-black mt-2 ${
+            selectedStatusFilter === 'In Progress' ? 'text-amber-50' : 'text-amber-900'
+          }`}>{inProgressCount}</div>
+          <div className={`text-[11px] mt-1 ${selectedStatusFilter === 'In Progress' ? 'text-amber-200' : 'text-slate-500'}`}>Under IT resolution</div>
         </div>
 
         <div
@@ -140,12 +157,16 @@ export const BranchDashboardView: React.FC<BranchDashboardViewProps> = ({
               : 'bg-white text-slate-900 border-slate-200 hover:border-emerald-200'
           }`}
         >
-          <div className="text-xs font-bold uppercase tracking-wider text-emerald-700 flex items-center justify-between">
+          <div className={`text-xs font-bold uppercase tracking-wider flex items-center justify-between ${
+            selectedStatusFilter === 'Resolved' ? 'text-emerald-300' : 'text-emerald-700'
+          }`}>
             <span>Resolved</span>
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            <CheckCircle2 className={`w-4 h-4 ${selectedStatusFilter === 'Resolved' ? 'text-emerald-300' : 'text-emerald-600'}`} />
           </div>
-          <div className="text-2xl sm:text-3xl font-black text-emerald-900 mt-2">{resolvedCount}</div>
-          <div className="text-[11px] text-slate-500 mt-1">Needs branch confirmation</div>
+          <div className={`text-2xl sm:text-3xl font-black mt-2 ${
+            selectedStatusFilter === 'Resolved' ? 'text-emerald-50' : 'text-emerald-900'
+          }`}>{resolvedCount}</div>
+          <div className={`text-[11px] mt-1 ${selectedStatusFilter === 'Resolved' ? 'text-emerald-200' : 'text-slate-500'}`}>Needs branch confirmation</div>
         </div>
 
         <div
@@ -156,26 +177,36 @@ export const BranchDashboardView: React.FC<BranchDashboardViewProps> = ({
               : 'bg-white text-slate-900 border-slate-200 hover:border-slate-300'
           }`}
         >
-          <div className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center justify-between">
+          <div className={`text-xs font-bold uppercase tracking-wider flex items-center justify-between ${
+            selectedStatusFilter === 'Closed' ? 'text-slate-300' : 'text-slate-600'
+          }`}>
             <span>Closed</span>
-            <Clock className="w-4 h-4 text-slate-500" />
+            <Clock className={`w-4 h-4 ${selectedStatusFilter === 'Closed' ? 'text-slate-300' : 'text-slate-500'}`} />
           </div>
-          <div className="text-2xl sm:text-3xl font-black text-slate-800 mt-2">{closedCount}</div>
-          <div className="text-[11px] text-slate-500 mt-1">Fully completed</div>
+          <div className={`text-2xl sm:text-3xl font-black mt-2 ${
+            selectedStatusFilter === 'Closed' ? 'text-slate-50' : 'text-slate-800'
+          }`}>{closedCount}</div>
+          <div className={`text-[11px] mt-1 ${selectedStatusFilter === 'Closed' ? 'text-slate-400' : 'text-slate-500'}`}>Fully completed</div>
         </div>
 
         <div
-          onClick={() => setSelectedStatusFilter('ALL')}
-          className={`p-4 rounded-xl border transition cursor-pointer bg-white text-slate-900 border-slate-200 hover:border-red-300 ${
-            slaBreachedCount > 0 ? 'ring-1 ring-red-200' : ''
+          onClick={() => setSelectedStatusFilter('SLA_BREACHED')}
+          className={`p-4 rounded-xl border transition cursor-pointer ${
+            selectedStatusFilter === 'SLA_BREACHED'
+              ? 'bg-red-900 text-white border-red-800 shadow-md ring-2 ring-red-400'
+              : 'bg-white text-slate-900 border-slate-200 hover:border-red-300'
           }`}
         >
-          <div className="text-xs font-bold uppercase tracking-wider text-red-700 flex items-center justify-between">
+          <div className={`text-xs font-bold uppercase tracking-wider flex items-center justify-between ${
+            selectedStatusFilter === 'SLA_BREACHED' ? 'text-red-300' : 'text-red-700'
+          }`}>
             <span>SLA Breached</span>
-            <AlarmClockOff className="w-4 h-4 text-red-500" />
+            <AlarmClockOff className={`w-4 h-4 ${selectedStatusFilter === 'SLA_BREACHED' ? 'text-red-300' : 'text-red-500'}`} />
           </div>
-          <div className="text-2xl sm:text-3xl font-black text-red-900 mt-2">{slaBreachedCount}</div>
-          <div className="text-[11px] text-slate-500 mt-1">Past service target</div>
+          <div className={`text-2xl sm:text-3xl font-black mt-2 ${
+            selectedStatusFilter === 'SLA_BREACHED' ? 'text-red-50' : 'text-red-900'
+          }`}>{slaBreachedCount}</div>
+          <div className={`text-[11px] mt-1 ${selectedStatusFilter === 'SLA_BREACHED' ? 'text-red-200' : 'text-slate-500'}`}>Past service target</div>
         </div>
       </div>
 

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { User } from '../types';
 import { BayanihanLogo } from '../components/BayanihanLogo';
-import { ShieldCheck, Lock, User as UserIcon, AlertCircle, ArrowRight, CheckCircle2, Building, Key } from 'lucide-react';
+import { ShieldCheck, Lock, User as UserIcon, AlertCircle, ArrowRight, CheckCircle2, Building, Key, Eye, EyeOff } from 'lucide-react';
 
 interface LoginViewProps {
   allUsers: User[];
@@ -11,6 +11,7 @@ interface LoginViewProps {
 export const LoginView: React.FC<LoginViewProps> = ({ allUsers, onLogin }) => {
   const [username, setUsername] = useState('branch.user');
   const [password, setPassword] = useState('password123');
+  const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
   const [showForgotModal, setShowForgotModal] = useState(false);
@@ -98,13 +99,22 @@ export const LoginView: React.FC<LoginViewProps> = ({ allUsers, onLogin }) => {
               <div className="relative">
                 <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:bg-white transition"
+                  className="w-full pl-9 pr-10 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:bg-white transition"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((s) => !s)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-emerald-700 transition cursor-pointer"
+                  title={showPassword ? 'Hide password' : 'Show password'}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
             </div>
 

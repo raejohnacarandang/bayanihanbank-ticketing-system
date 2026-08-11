@@ -513,6 +513,13 @@ export function markNotificationAsRead(state: AppState, id: string): AppState {
   return { ...state, notifications };
 }
 
+export function markAllNotificationsAsRead(state: AppState, userId: string): AppState {
+  const notifications = state.notifications.map((n) =>
+    n.userId === userId ? { ...n, read: true } : n
+  );
+  return { ...state, notifications };
+}
+
 export function setCurrentUser(state: AppState, user: User): AppState {
   return { ...state, currentUser: user };
 }
@@ -533,6 +540,8 @@ export interface CreateUserParams {
   password?: string;
   /** Pre-computed scrypt hash. Server computes it; the browser falls back to demo login. */
   passwordHash?: string;
+  /** True to force the user to change the password on first login. */
+  mustChangePassword?: boolean;
 }
 
 export interface UpdateUserChanges {
@@ -546,6 +555,8 @@ export interface UpdateUserChanges {
   /** Plain-text password (server hashes it). */
   password?: string;
   passwordHash?: string;
+  /** True to force the user to change the password on next login. */
+  mustChangePassword?: boolean;
 }
 
 export function createUser(state: AppState, params: CreateUserParams, currentUser: User): AppState {
@@ -560,6 +571,7 @@ export function createUser(state: AppState, params: CreateUserParams, currentUse
     branchName: params.role === 'BRANCH_USER' ? params.branchName : undefined,
     department: params.role === 'BRANCH_USER' ? undefined : params.department,
     passwordHash: params.passwordHash,
+    mustChangePassword: params.mustChangePassword ?? true,
   };
 
   let next: AppState = {

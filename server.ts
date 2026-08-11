@@ -34,6 +34,7 @@ import {
   createUser,
   deleteBranch,
   deleteUser,
+  markAllNotificationsAsRead,
   markNotificationAsRead,
   setCurrentUser,
   updateBranch,
@@ -76,6 +77,23 @@ const app = express();
 app.use(express.json());
 
 // ---------------------------------------------------------------------------
+// Real-time broadcast (Server-Sent Events)
+// ---------------------------------------------------------------------------
+
+const sseClients = new Set<Response>();
+
+function broadcastUpdate(): void {
+  const payload = `data: ${JSON.stringify({ type: 'update', at: Date.now() })}\n\n`;
+  for (const res of sseClients) {
+    try {
+      res.write(payload);
+    } catch {
+      sseClients.delete(res);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -91,6 +109,7 @@ async function commit(res: Response, before: AppState, after: AppState, payload:
   try {
     await persistDiff(before, after);
     res.json(payload);
+    broadcastUpdate();
   } catch (err) {
     console.error('[mysql] Failed to persist state.', err);
     res.status(500).json({ error: 'Failed to persist state to MySQL' });
@@ -121,7 +140,7 @@ function ticketListForViewer(state: AppState, viewer: User, filters: Record<stri
   return tickets;
 }
 
-const DEMO_USERNAMES = ['branch.user', 'maria.santos', 'it.staff', 'ana.cruz', 'admin'];
+const DEMO_USERNAMES = ['branch.user', 'maria.santos', 'it.staff', 'ana.cruz', 'admin', 'auditor'];
 
 // ---------------------------------------------------------------------------
 // Auth
@@ -143,9 +162,11 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
 });
 
 app.get('/api/auth/demo-accounts', (_req: Request, res: Response) => {
-  const users = state.users
-    .filter((u) => DEMO_USERNAMES.includes(u.username))
-    .map(publicUser);
+  // Disabled in production (DEMO_MODE=false): demo usernames must not leak.
+  const users =
+    process.env.DEMO_MODE === 'false'
+      ? []
+      : state.users.filter((u) => DEMO_USERNAMES.includes(u.username)).map(publicUser);
   res.json({ users });
 });
 
@@ -199,8 +220,60 @@ app.post('/api/auth/logout', (_req: Request, res: Response) => {
   res.json({ ok: true });
 });
 
+app.patch('/api/auth/password', async (req: Request, res: Response) => {
+  const user = actor(req);
+  const { currentPassword, newPassword } = req.body as {
+    currentPassword?: string;
+    newPassword?: string;
+  };
+  if (!currentPassword) {
+    return res.status(400).json({ error: 'Current password is required' });
+  }
+  if (!newPassword || newPassword.length < 6) {
+    return res.status(400).json({ error: 'New password must be at least 6 characters long' });
+  }
+  if (!verifyPassword(currentPassword, user.passwordHash)) {
+    return res.status(400).json({ error: 'Current password is incorrect' });
+  }
+  const before = state;
+  const after = updateUser(
+    state,
+    user.id,
+    { passwordHash: hashPassword(newPassword), mustChangePassword: false },
+    user
+  );
+  const updated = after.users.find((u) => u.id === user.id);
+  await commit(res, before, after, { ok: true, user: publicUser(updated!) });
+});
+
 app.get('/api/auth/me', (req: Request, res: Response) => {
   res.json({ user: publicUser(actor(req)) });
+});
+
+// Server-Sent Events stream — notifies browsers when state changes.
+// EventSource cannot send headers, so the JWT is passed as a query parameter.
+app.get('/api/events', (req: Request, res: Response) => {
+  const token = String(req.query.token || '');
+  const payload = verifyToken(token);
+  if (!payload) {
+    res.status(401).json({ error: 'Invalid or expired token' });
+    return;
+  }
+  const user = state.users.find((u) => u.id === payload.sub);
+  if (!user) {
+    res.status(401).json({ error: 'Account no longer exists' });
+    return;
+  }
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+  res.write('retry: 15000\n\n');
+  res.write(`data: ${JSON.stringify({ type: 'ready', at: Date.now() })}\n\n`);
+  sseClients.add(res);
+  req.on('close', () => {
+    sseClients.delete(res);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -359,6 +432,13 @@ app.post('/api/notifications/:id/read', async (req: Request, res: Response) => {
   await commit(res, before, after, { ok: true });
 });
 
+app.post('/api/notifications/read-all', async (req: Request, res: Response) => {
+  const viewer = actor(req);
+  const before = state;
+  const after = markAllNotificationsAsRead(state, viewer.id);
+  await commit(res, before, after, { ok: true });
+});
+
 // ---------------------------------------------------------------------------
 // Admin management (users & branches)
 // ---------------------------------------------------------------------------
@@ -370,7 +450,11 @@ app.post('/api/users', async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'username, name, role, and email are required' });
   }
   const before = state;
-  const after = createUser(state, { ...user, passwordHash: hashPassword(user.password || DEFAULT_PASSWORD) }, actor(req));
+  const after = createUser(
+    state,
+    { ...user, passwordHash: hashPassword(user.password || DEFAULT_PASSWORD), mustChangePassword: true },
+    actor(req)
+  );
   const created = after.users[after.users.length - 1];
   await commit(res, before, after, { user: publicUser(created) });
 });
@@ -383,6 +467,7 @@ app.patch('/api/users/:id', async (req: Request, res: Response) => {
   const withPassword: UpdateUserChanges = {
     ...changes,
     passwordHash: changes.password ? hashPassword(changes.password) : changes.passwordHash,
+    ...(changes.password ? { mustChangePassword: true } : {}),
   };
   const after = updateUser(state, req.params.id, withPassword, actor(req));
   if (after === before) return res.status(404).json({ error: 'User not found or cannot be updated' });
