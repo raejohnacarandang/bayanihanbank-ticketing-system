@@ -1,0 +1,6 @@
+{
+  "name": "Bayanihan Bank IT Service Desk",
+  "description": "Internal IT Ticketing & Service Desk Prototype for Bayanihan Bank branches and Main IT.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
