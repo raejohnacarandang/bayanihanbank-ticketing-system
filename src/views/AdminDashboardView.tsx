@@ -1,6 +1,20 @@
-import React, { useState } from 'react';
-import { User, Branch, CategoryInfo, AuditLog, Ticket, TicketStatus, UserRole, BranchAssignment, NotificationItem } from '../types';
-import type { CreateBranchParams, CreateUserParams, UpdateUserChanges } from '../services/store';
+import React, { useState } from "react";
+import {
+  User,
+  Branch,
+  CategoryInfo,
+  AuditLog,
+  Ticket,
+  TicketStatus,
+  UserRole,
+  BranchAssignment,
+  NotificationItem,
+} from "../types";
+import type {
+  CreateBranchParams,
+  CreateUserParams,
+  UpdateUserChanges,
+} from "../services/store";
 import {
   Users,
   Building,
@@ -25,10 +39,16 @@ import {
   Eye,
   EyeOff,
   Monitor,
-  type LucideIcon
-} from 'lucide-react';
+  type LucideIcon,
+} from "lucide-react";
 
-type AdminTab = 'overview' | 'users' | 'branches' | 'categories' | 'it_staff' | 'activity_logs';
+type AdminTab =
+  | "overview"
+  | "users"
+  | "branches"
+  | "categories"
+  | "it_staff"
+  | "activity_logs";
 
 interface AdminDashboardViewProps {
   users: User[];
@@ -39,14 +59,17 @@ interface AdminDashboardViewProps {
   notifications: NotificationItem[];
   activeTab: AdminTab;
   onSelectTab: (tab: AdminTab) => void;
-  mode?: 'admin' | 'auditor';
+  mode?: "admin" | "auditor";
   onCreateUser?: (user: CreateUserParams) => void;
   onUpdateUser?: (userId: string, changes: UpdateUserChanges) => void;
   onDeleteUser?: (userId: string) => void;
   onCreateBranch?: (branch: CreateBranchParams) => void;
   onUpdateBranch?: (branchId: string, changes: Partial<Branch>) => void;
   onDeleteBranch?: (branchId: string) => void;
-  onUpdateStaffAssignments?: (staffUserId: string, assignments: BranchAssignment[]) => void;
+  onUpdateStaffAssignments?: (
+    staffUserId: string,
+    assignments: BranchAssignment[],
+  ) => void;
   onViewStatusTickets?: (status: TicketStatus) => void;
 }
 
@@ -66,17 +89,19 @@ interface BranchFormState {
   id?: string;
   name: string;
   location: string;
-  status: 'Active' | 'Inactive';
+  status: "Active" | "Inactive";
   userCount: number;
 }
 
-type DeleteTarget = { type: 'user'; id: string; name: string } | { type: 'branch'; id: string; name: string };
+type DeleteTarget =
+  | { type: "user"; id: string; name: string }
+  | { type: "branch"; id: string; name: string };
 
 const ROLE_OPTIONS: { value: UserRole; label: string }[] = [
-  { value: 'BRANCH_USER', label: 'Branch User' },
-  { value: 'IT_STAFF', label: 'IT Specialist' },
-  { value: 'ADMINISTRATOR', label: 'Administrator' },
-  { value: 'AUDITOR', label: 'Auditor (View-Only)' },
+  { value: "BRANCH_USER", label: "Branch User" },
+  { value: "IT_STAFF", label: "IT Specialist" },
+  { value: "ADMINISTRATOR", label: "Administrator" },
+  { value: "AUDITOR", label: "Auditor (View-Only)" },
 ];
 
 export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
@@ -87,7 +112,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
   tickets,
   notifications,
   activeTab,
-  mode = 'admin',
+  mode = "admin",
   onCreateUser,
   onUpdateUser,
   onDeleteUser,
@@ -97,41 +122,93 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
   onUpdateStaffAssignments,
   onViewStatusTickets,
 }) => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [userModal, setUserModal] = useState<{ mode: 'create' | 'edit'; user?: User } | null>(null);
-  const [branchModal, setBranchModal] = useState<{ mode: 'create' | 'edit'; branch?: Branch } | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [userModal, setUserModal] = useState<{
+    mode: "create" | "edit";
+    user?: User;
+  } | null>(null);
+  const [branchModal, setBranchModal] = useState<{
+    mode: "create" | "edit";
+    branch?: Branch;
+  } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [assignmentModal, setAssignmentModal] = useState<User | null>(null);
-  const isAuditor = mode === 'auditor';
-  const isAdmin = mode === 'admin';
+  const isAuditor = mode === "auditor";
+  const isAdmin = mode === "admin";
   const canManage = isAdmin && !!onCreateUser && !!onCreateBranch;
 
   const totalUsers = users.length;
   const totalBranches = branches.length;
-  const totalItStaff = users.filter((u) => u.role === 'IT_STAFF').length;
+  const totalItStaff = users.filter((u) => u.role === "IT_STAFF").length;
   const totalTickets = tickets.length;
-  const openTickets = tickets.filter((t) => t.status !== 'Closed').length;
-  const resolvedTickets = tickets.filter((t) => t.status === 'Resolved' || t.status === 'Closed').length;
+  const openTickets = tickets.filter((t) => t.status !== "Closed").length;
+  const resolvedTickets = tickets.filter(
+    (t) => t.status === "Resolved" || t.status === "Closed",
+  ).length;
 
-  const STATUS_DEFS: { status: TicketStatus; label: string; icon: LucideIcon; cardClass: string; barClass: string; countClass: string }[] = [
-    { status: 'In Progress', label: 'In Progress', icon: PlayCircle, cardClass: 'bg-amber-50 border-amber-200', barClass: 'bg-amber-500', countClass: 'text-amber-900' },
-    { status: 'Pending', label: 'Pending', icon: Clock, cardClass: 'bg-purple-50 border-purple-200', barClass: 'bg-purple-600', countClass: 'text-purple-900' },
-    { status: 'Resolved', label: 'Resolved', icon: CheckCircle2, cardClass: 'bg-emerald-50 border-emerald-200', barClass: 'bg-emerald-600', countClass: 'text-emerald-900' },
+  const STATUS_DEFS: {
+    status: TicketStatus;
+    label: string;
+    icon: LucideIcon;
+    cardClass: string;
+    barClass: string;
+    countClass: string;
+  }[] = [
+    {
+      status: "In Progress",
+      label: "In Progress",
+      icon: PlayCircle,
+      cardClass: "bg-amber-50 border-amber-200",
+      barClass: "bg-amber-500",
+      countClass: "text-amber-900",
+    },
+    {
+      status: "Pending",
+      label: "Pending",
+      icon: Clock,
+      cardClass: "bg-purple-50 border-purple-200",
+      barClass: "bg-purple-600",
+      countClass: "text-purple-900",
+    },
+    {
+      status: "Resolved",
+      label: "Resolved",
+      icon: CheckCircle2,
+      cardClass: "bg-emerald-50 border-emerald-200",
+      barClass: "bg-emerald-600",
+      countClass: "text-emerald-900",
+    },
   ];
-  const statusCount = (s: TicketStatus) => tickets.filter((t) => t.status === s).length;
+  const statusCount = (s: TicketStatus) =>
+    tickets.filter((t) => t.status === s).length;
 
-  const itStaff = users.filter((u) => u.role === 'IT_STAFF');
+  const itStaff = users.filter((u) => u.role === "IT_STAFF");
 
   const staffStatus = itStaff.map((s) => {
     const staffTickets = tickets.filter((t) => t.assignedToId === s.id);
-    const pendingCount = staffTickets.filter((t) => t.status === 'Pending').length;
-    const inProgressCount = staffTickets.filter((t) => t.status === 'In Progress').length;
-    const resolvedCount = staffTickets.filter((t) => t.status === 'Resolved').length;
-    const newNotificationCount = notifications.filter((n) => n.userId === s.id && !n.read).length;
-    return { staff: s, pendingCount, inProgressCount, resolvedCount, newNotificationCount };
+    const pendingCount = staffTickets.filter(
+      (t) => t.status === "Pending",
+    ).length;
+    const inProgressCount = staffTickets.filter(
+      (t) => t.status === "In Progress",
+    ).length;
+    const resolvedCount = staffTickets.filter(
+      (t) => t.status === "Resolved",
+    ).length;
+    const newNotificationCount = notifications.filter(
+      (n) => n.userId === s.id && !n.read,
+    ).length;
+    return {
+      staff: s,
+      pendingCount,
+      inProgressCount,
+      resolvedCount,
+      newNotificationCount,
+    };
   });
 
-  const branchById = (id?: string): Branch | undefined => branches.find((b) => b.id === id);
+  const branchById = (id?: string): Branch | undefined =>
+    branches.find((b) => b.id === id);
 
   const handleUserFormSubmit = (form: UserFormState) => {
     if (form.id) {
@@ -140,9 +217,9 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
         username: form.username,
         role: form.role,
         email: form.email,
-        branchId: form.role === 'BRANCH_USER' ? form.branchId : undefined,
-        branchName: form.role === 'BRANCH_USER' ? form.branchName : undefined,
-        department: form.role === 'BRANCH_USER' ? undefined : form.department,
+        branchId: form.role === "BRANCH_USER" ? form.branchId : undefined,
+        branchName: form.role === "BRANCH_USER" ? form.branchName : undefined,
+        department: form.role === "BRANCH_USER" ? undefined : form.department,
         password: form.password || undefined,
       });
     } else {
@@ -151,9 +228,9 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
         username: form.username,
         role: form.role,
         email: form.email,
-        branchId: form.role === 'BRANCH_USER' ? form.branchId : undefined,
-        branchName: form.role === 'BRANCH_USER' ? form.branchName : undefined,
-        department: form.role === 'BRANCH_USER' ? undefined : form.department,
+        branchId: form.role === "BRANCH_USER" ? form.branchId : undefined,
+        branchName: form.role === "BRANCH_USER" ? form.branchName : undefined,
+        department: form.role === "BRANCH_USER" ? undefined : form.department,
         password: form.password || undefined,
       });
     }
@@ -181,7 +258,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
 
   const handleDeleteConfirm = () => {
     if (!deleteTarget) return;
-    if (deleteTarget.type === 'user') onDeleteUser?.(deleteTarget.id);
+    if (deleteTarget.type === "user") onDeleteUser?.(deleteTarget.id);
     else onDeleteBranch?.(deleteTarget.id);
     setDeleteTarget(null);
   };
@@ -191,27 +268,37 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
       {/* Admin Header */}
       <div className="bg-slate-900 text-white p-6 rounded-2xl border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded border text-xs font-bold uppercase tracking-wider mb-2 ${
-            isAuditor
-              ? 'bg-teal-900 text-teal-200 border-teal-700'
-              : 'bg-purple-900 text-purple-200 border-purple-700'
-          }`}>
-            <ShieldCheck className={`w-3.5 h-3.5 ${isAuditor ? 'text-teal-400' : 'text-purple-400'}`} />
-            <span>{isAuditor ? 'Audit Console (View-Only)' : 'Administrator Control Console'}</span>
+          <div
+            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded border text-xs font-bold uppercase tracking-wider mb-2 ${
+              isAuditor
+                ? "bg-teal-900 text-teal-200 border-teal-700"
+                : "bg-purple-900 text-purple-200 border-purple-700"
+            }`}
+          >
+            <ShieldCheck
+              className={`w-3.5 h-3.5 ${isAuditor ? "text-teal-400" : "text-purple-400"}`}
+            />
+            <span>
+              {isAuditor
+                ? "Audit Console (View-Only)"
+                : "Administrator Control Console"}
+            </span>
           </div>
           <h1 className="text-2xl font-black">
-            {isAuditor ? 'Audit & Monitoring' : 'System Administration & Settings'}
+            {isAuditor
+              ? "Audit & Monitoring"
+              : "System Administration & Settings"}
           </h1>
           <p className="text-xs text-slate-300 mt-1">
             {isAuditor
-              ? 'Read-only monitoring of tickets and audit activity for the Internal Audit Department'
-              : 'Manage users, branches, IT specialist, and review system audit activity'}
+              ? "Read-only monitoring of tickets and audit activity for the Internal Audit Department"
+              : "Manage users, branches, IT specialist, and review system audit activity"}
           </p>
         </div>
       </div>
 
       {/* IT Specialist Status (Overview only) */}
-      {activeTab === 'overview' && (
+      {activeTab === "overview" && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="p-4 sm:p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-slate-50/60">
             <div>
@@ -219,82 +306,139 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
                 <UserCheck className="w-4 h-4 text-sky-600" />
                 <span>IT Specialist Status</span>
               </h3>
-              <p className="text-xs text-slate-500">Per-staff workload and new notification count</p>
+              <p className="text-xs text-slate-500">
+                Per-staff workload and new notification count
+              </p>
             </div>
-            <span className="text-xs text-slate-500 font-mono">{itStaff.length} IT specialist</span>
+            <span className="text-xs text-slate-500 font-mono">
+              {itStaff.length} IT specialist
+            </span>
           </div>
           <div className="p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {staffStatus.map(({ staff: s, pendingCount, inProgressCount, resolvedCount, newNotificationCount }) => (
-              <div key={s.id} className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-9 h-9 rounded-full bg-amber-600 text-white font-bold flex items-center justify-center shrink-0 border border-amber-300/40">
-                    {s.name.charAt(0)}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="font-bold text-slate-900 text-sm truncate">{s.name}</div>
-                    <div className="text-[11px] text-slate-500 font-mono truncate">{s.username}</div>
-                  </div>
-                  {newNotificationCount > 0 && (
-                    <span className="min-w-6 h-6 px-1.5 rounded-full bg-emerald-600 text-white text-xs font-black flex items-center justify-center shrink-0">
-                      {newNotificationCount}
-                    </span>
-                  )}
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-center">
-                    <div className="text-[9px] font-bold text-amber-800 uppercase tracking-wider">In Progress</div>
-                    <div className="text-lg font-black text-amber-900">{inProgressCount}</div>
-                  </div>
-                  <div className="p-2.5 rounded-lg bg-purple-50 border border-purple-200 text-center">
-                    <div className="text-[9px] font-bold text-purple-800 uppercase tracking-wider">Pending</div>
-                    <div className="text-lg font-black text-purple-900">{pendingCount}</div>
-                  </div>
-                  <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-center">
-                    <div className="text-[9px] font-bold text-emerald-800 uppercase tracking-wider">Resolved</div>
-                    <div className="text-lg font-black text-emerald-900">{resolvedCount}</div>
-                  </div>
-                </div>
-                <button
-                  onClick={() => window.open(`/wallboard/${s.id}`, '_blank', 'noopener')}
-                  className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-slate-900 hover:bg-sky-700 text-white text-[11px] font-bold transition cursor-pointer"
-                  title="Open this staff member's status on a dedicated monitor"
+            {staffStatus.map(
+              ({
+                staff: s,
+                pendingCount,
+                inProgressCount,
+                resolvedCount,
+                newNotificationCount,
+              }) => (
+                <div
+                  key={s.id}
+                  className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3"
                 >
-                  <Monitor className="w-3.5 h-3.5" />
-                  <span>Monitor</span>
-                </button>
-              </div>
-            ))}
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-full bg-amber-600 text-white font-bold flex items-center justify-center shrink-0 border border-amber-300/40">
+                      {s.name.charAt(0)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-bold text-slate-900 text-sm truncate">
+                        {s.name}
+                      </div>
+                      <div className="text-[11px] text-slate-500 font-mono truncate">
+                        {s.username}
+                      </div>
+                    </div>
+                    {newNotificationCount > 0 && (
+                      <span className="min-w-6 h-6 px-1.5 rounded-full bg-emerald-600 text-white text-xs font-black flex items-center justify-center shrink-0">
+                        {newNotificationCount}
+                      </span>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-center">
+                      <div className="text-[9px] font-bold text-amber-800 uppercase tracking-wider">
+                        In Progress
+                      </div>
+                      <div className="text-lg font-black text-amber-900">
+                        {inProgressCount}
+                      </div>
+                    </div>
+                    <div className="p-2.5 rounded-lg bg-purple-50 border border-purple-200 text-center">
+                      <div className="text-[9px] font-bold text-purple-800 uppercase tracking-wider">
+                        Pending
+                      </div>
+                      <div className="text-lg font-black text-purple-900">
+                        {pendingCount}
+                      </div>
+                    </div>
+                    <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-center">
+                      <div className="text-[9px] font-bold text-emerald-800 uppercase tracking-wider">
+                        Resolved
+                      </div>
+                      <div className="text-lg font-black text-emerald-900">
+                        {resolvedCount}
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() =>
+                      window.open(`/wallboard/${s.id}`, "_blank", "noopener")
+                    }
+                    className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-slate-900 hover:bg-sky-700 text-white text-[11px] font-bold transition cursor-pointer"
+                    title="Open this staff member's status on a dedicated monitor"
+                  >
+                    <Monitor className="w-3.5 h-3.5" />
+                    <span>Monitor</span>
+                  </button>
+                </div>
+              ),
+            )}
           </div>
         </div>
       )}
 
       {/* Overview Stat Cards */}
-      {activeTab === 'overview' && (
+      {activeTab === "overview" && (
         <div className="space-y-6">
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <div className="bg-white p-4 rounded-xl border border-slate-200">
-              <span className="text-[10px] font-bold text-slate-500 uppercase">Total Users</span>
-              <div className="text-2xl font-black text-slate-900 mt-1">{totalUsers}</div>
+              <span className="text-[10px] font-bold text-slate-500 uppercase">
+                Total Users
+              </span>
+              <div className="text-2xl font-black text-slate-900 mt-1">
+                {totalUsers}
+              </div>
             </div>
             <div className="bg-white p-4 rounded-xl border border-slate-200">
-              <span className="text-[10px] font-bold text-slate-500 uppercase">Total Branches</span>
-              <div className="text-2xl font-black text-slate-900 mt-1">{totalBranches}</div>
+              <span className="text-[10px] font-bold text-slate-500 uppercase">
+                Total Branches
+              </span>
+              <div className="text-2xl font-black text-slate-900 mt-1">
+                {totalBranches}
+              </div>
             </div>
             <div className="bg-white p-4 rounded-xl border border-slate-200">
-              <span className="text-[10px] font-bold text-slate-500 uppercase">IT Specialist</span>
-              <div className="text-2xl font-black text-emerald-900 mt-1">{totalItStaff}</div>
+              <span className="text-[10px] font-bold text-slate-500 uppercase">
+                IT Specialist
+              </span>
+              <div className="text-2xl font-black text-emerald-900 mt-1">
+                {totalItStaff}
+              </div>
             </div>
             <div className="bg-white p-4 rounded-xl border border-slate-200">
-              <span className="text-[10px] font-bold text-slate-500 uppercase">Total Tickets</span>
-              <div className="text-2xl font-black text-slate-900 mt-1">{totalTickets}</div>
+              <span className="text-[10px] font-bold text-slate-500 uppercase">
+                Total Tickets
+              </span>
+              <div className="text-2xl font-black text-slate-900 mt-1">
+                {totalTickets}
+              </div>
             </div>
             <div className="bg-white p-4 rounded-xl border border-slate-200">
-              <span className="text-[10px] font-bold text-amber-700 uppercase">Open Tickets</span>
-              <div className="text-2xl font-black text-amber-900 mt-1">{openTickets}</div>
+              <span className="text-[10px] font-bold text-amber-700 uppercase">
+                Open Tickets
+              </span>
+              <div className="text-2xl font-black text-amber-900 mt-1">
+                {openTickets}
+              </div>
             </div>
             <div className="bg-white p-4 rounded-xl border border-slate-200">
-              <span className="text-[10px] font-bold text-emerald-700 uppercase">Resolved</span>
-              <div className="text-2xl font-black text-emerald-900 mt-1">{resolvedTickets}</div>
+              <span className="text-[10px] font-bold text-emerald-700 uppercase">
+                Resolved
+              </span>
+              <div className="text-2xl font-black text-emerald-900 mt-1">
+                {resolvedTickets}
+              </div>
             </div>
           </div>
 
@@ -306,21 +450,30 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
                   <BarChart3 className="w-4 h-4 text-purple-600" />
                   <span>Ticket Status Breakdown</span>
                 </h3>
-                <p className="text-xs text-slate-500">Distribution of tickets by current status</p>
+                <p className="text-xs text-slate-500">
+                  Distribution of tickets by current status
+                </p>
               </div>
-              <span className="text-xs text-slate-500 font-mono">{totalTickets} tickets total</span>
+              <span className="text-xs text-slate-500 font-mono">
+                {totalTickets} tickets total
+              </span>
             </div>
             <div className="p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
               {STATUS_DEFS.map((s) => {
                 const count = statusCount(s.status);
-                const pct = totalTickets > 0 ? Math.round((count / totalTickets) * 100) : 0;
+                const pct =
+                  totalTickets > 0
+                    ? Math.round((count / totalTickets) * 100)
+                    : 0;
                 const Icon = s.icon;
                 return (
                   <div
                     key={s.status}
                     onClick={() => onViewStatusTickets?.(s.status)}
                     className={`p-4 rounded-xl border ${s.cardClass} ${
-                      onViewStatusTickets ? 'cursor-pointer hover:ring-2 hover:ring-purple-300 transition' : ''
+                      onViewStatusTickets
+                        ? "cursor-pointer hover:ring-2 hover:ring-purple-300 transition"
+                        : ""
                     }`}
                   >
                     <div className="flex items-center justify-between">
@@ -329,8 +482,12 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
                       </span>
                       <Icon className="w-3.5 h-3.5 text-slate-500" />
                     </div>
-                    <div className={`text-2xl font-black mt-1 ${s.countClass}`}>{count}</div>
-                    <div className="text-[10px] text-slate-500 font-semibold">{pct}% of total</div>
+                    <div className={`text-2xl font-black mt-1 ${s.countClass}`}>
+                      {count}
+                    </div>
+                    <div className="text-[10px] text-slate-500 font-semibold">
+                      {pct}% of total
+                    </div>
                     <div className="mt-2 h-1.5 rounded-full bg-white/70 overflow-hidden">
                       <div
                         className={`h-full rounded-full ${s.barClass}`}
@@ -349,22 +506,29 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
               <span>Prototype Note on Administrator Section</span>
             </div>
             <p className="leading-relaxed text-amber-900/90">
-              This administrator interface is provided as a conceptual representation of future system administration features. User creation, Active Directory syncing, and branch management will be wired to actual database tables in the backend development phase.
+              This administrator interface is provided as a conceptual
+              representation of future system administration features. User
+              creation, Active Directory syncing, and branch management will be
+              wired to actual database tables in the backend development phase.
             </p>
           </div>
         </div>
       )}
 
       {/* Users Tab */}
-      {activeTab === 'users' && (
+      {activeTab === "users" && (
         <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
           <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
-            <h3 className="font-bold text-slate-900 text-sm">System Users Directory</h3>
+            <h3 className="font-bold text-slate-900 text-sm">
+              System Users Directory
+            </h3>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-500">{users.length} registered accounts</span>
+              <span className="text-xs text-slate-500">
+                {users.length} registered accounts
+              </span>
               {canManage && (
                 <button
-                  onClick={() => setUserModal({ mode: 'create' })}
+                  onClick={() => setUserModal({ mode: "create" })}
                   className="px-3 py-1.5 bg-purple-700 hover:bg-purple-600 text-white font-bold text-[11px] rounded-lg transition flex items-center gap-1.5 cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
@@ -395,7 +559,9 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
                       {u.role}
                     </span>
                   </td>
-                  <td className="p-3 text-slate-700">{u.branchName || u.department || '—'}</td>
+                  <td className="p-3 text-slate-700">
+                    {u.branchName || u.department || "—"}
+                  </td>
                   <td className="p-3 text-slate-500 font-mono">{u.email}</td>
                   <td className="p-3 text-right">
                     <div className="inline-flex flex-col items-end gap-1">
@@ -412,15 +578,24 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
                   {canManage && (
                     <td className="p-3 text-right whitespace-nowrap">
                       <button
-                        onClick={() => setUserModal({ mode: 'edit', user: u })}
+                        onClick={() => setUserModal({ mode: "edit", user: u })}
                         className="p-1.5 rounded bg-slate-100 hover:bg-purple-700 hover:text-white text-slate-600 transition inline-flex cursor-pointer"
                         title="Edit account"
                       >
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
                       <button
-                        onClick={() => setDeleteTarget({ type: 'user', id: u.id, name: u.name })}
-                        disabled={u.id === users.find((x) => x.role === 'ADMINISTRATOR')?.id}
+                        onClick={() =>
+                          setDeleteTarget({
+                            type: "user",
+                            id: u.id,
+                            name: u.name,
+                          })
+                        }
+                        disabled={
+                          u.id ===
+                          users.find((x) => x.role === "ADMINISTRATOR")?.id
+                        }
                         className="p-1.5 rounded bg-slate-100 hover:bg-red-700 hover:text-white text-slate-600 transition inline-flex ml-1 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                         title="Delete account"
                       >
@@ -436,7 +611,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
       )}
 
       {/* IT Specialist Settings Tab */}
-      {activeTab === 'it_staff' && (
+      {activeTab === "it_staff" && (
         <div className="space-y-4">
           <div className="bg-sky-50 border border-sky-200 rounded-xl p-4 text-xs text-sky-900 space-y-1">
             <div className="font-bold text-sky-950 flex items-center gap-1.5">
@@ -444,19 +619,29 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
               <span>IT Specialist Settings</span>
             </div>
             <p className="leading-relaxed text-sky-900/80">
-              Manage Main IT Department staff accounts. IT specialist receive notifications for every new ticket and
-              handle the service desk queue. New tickets are also visible to administrators.
+              Manage Main IT Department staff accounts. IT specialist receive
+              notifications for every new ticket and handle the service desk
+              queue. New tickets are also visible to administrators.
             </p>
           </div>
 
           <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
             <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
-              <h3 className="font-bold text-slate-900 text-sm">Main IT Department Roster</h3>
+              <h3 className="font-bold text-slate-900 text-sm">
+                Main IT Department Roster
+              </h3>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-500">{itStaff.length} IT specialist accounts</span>
+                <span className="text-xs text-slate-500">
+                  {itStaff.length} IT specialist accounts
+                </span>
                 {canManage && (
                   <button
-                    onClick={() => setUserModal({ mode: 'create', user: { role: 'IT_STAFF' } as User })}
+                    onClick={() =>
+                      setUserModal({
+                        mode: "create",
+                        user: { role: "IT_STAFF" } as User,
+                      })
+                    }
                     className="px-3 py-1.5 bg-sky-700 hover:bg-sky-600 text-white font-bold text-[11px] rounded-lg transition flex items-center gap-1.5 cursor-pointer"
                   >
                     <Plus className="w-3.5 h-3.5" />
@@ -469,24 +654,34 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 p-4">
               {itStaff.length === 0 && (
                 <div className="lg:col-span-2 p-8 text-center text-slate-400 text-xs">
-                  No IT specialist accounts yet. Click "Add IT Specialist" to create one.
+                  No IT specialist accounts yet. Click "Add IT Specialist" to
+                  create one.
                 </div>
               )}
               {itStaff.map((s) => (
-                <div key={s.id} className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-col gap-3">
+                <div
+                  key={s.id}
+                  className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-col gap-3"
+                >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-3 min-w-0">
                       <div className="w-9 h-9 rounded-full bg-amber-600 text-white font-bold flex items-center justify-center shrink-0 border border-amber-300/40">
                         {s.name.charAt(0)}
                       </div>
                       <div className="min-w-0">
-                        <div className="font-bold text-slate-900 text-sm">{s.name}</div>
-                        <div className="font-mono text-[11px] text-slate-500">{s.username}</div>
+                        <div className="font-bold text-slate-900 text-sm">
+                          {s.name}
+                        </div>
+                        <div className="font-mono text-[11px] text-slate-500">
+                          {s.username}
+                        </div>
                         <div className="text-[11px] text-slate-600 mt-1 flex items-center gap-1">
                           <UserCheck className="w-3 h-3 text-amber-600" />
-                          {s.department || 'Main IT Department'}
+                          {s.department || "Main IT Department"}
                         </div>
-                        <div className="text-[11px] text-slate-500 font-mono mt-0.5">{s.email}</div>
+                        <div className="text-[11px] text-slate-500 font-mono mt-0.5">
+                          {s.email}
+                        </div>
                       </div>
                     </div>
                     {canManage && (
@@ -500,14 +695,22 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
                           <span>Assign Branches</span>
                         </button>
                         <button
-                          onClick={() => setUserModal({ mode: 'edit', user: s })}
+                          onClick={() =>
+                            setUserModal({ mode: "edit", user: s })
+                          }
                           className="p-1.5 rounded bg-white hover:bg-sky-700 hover:text-white text-slate-600 border border-slate-200 transition cursor-pointer"
                           title="Edit IT specialist"
                         >
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
                         <button
-                          onClick={() => setDeleteTarget({ type: 'user', id: s.id, name: s.name })}
+                          onClick={() =>
+                            setDeleteTarget({
+                              type: "user",
+                              id: s.id,
+                              name: s.name,
+                            })
+                          }
                           className="p-1.5 rounded bg-white hover:bg-red-700 hover:text-white text-slate-600 border border-slate-200 transition cursor-pointer"
                           title="Remove IT specialist"
                         >
@@ -526,25 +729,37 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {s.assignments.map((a) => {
-                          const expired = new Date(a.expiresAt).getTime() < Date.now();
+                          const expired =
+                            new Date(a.expiresAt).getTime() < Date.now();
                           return (
                             <div
                               key={a.branchId}
                               className={`px-2.5 py-1.5 rounded-lg border text-[11px] flex items-center gap-1.5 ${
                                 expired
-                                  ? 'bg-red-50 border-red-200 text-red-800'
-                                  : 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                                  ? "bg-red-50 border-red-200 text-red-800"
+                                  : "bg-emerald-50 border-emerald-200 text-emerald-900"
                               }`}
                             >
                               <Building className="w-3 h-3 shrink-0" />
-                              <span className="font-semibold">{a.branchName}</span>
+                              <span className="font-semibold">
+                                {a.branchName}
+                              </span>
                               <span className="opacity-70">•</span>
                               <span className="flex items-center gap-1 font-medium">
                                 <CalendarClock className="w-3 h-3" />
                                 {a.durationMonths} mo
                               </span>
                               <span className="opacity-60">
-                                (until {new Date(a.expiresAt).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })})
+                                (until{" "}
+                                {new Date(a.expiresAt).toLocaleDateString(
+                                  "en-US",
+                                  {
+                                    month: "short",
+                                    day: "2-digit",
+                                    year: "numeric",
+                                  },
+                                )}
+                                )
                               </span>
                               {expired && (
                                 <span className="text-[9px] font-bold bg-red-100 px-1 py-0.5 rounded ml-0.5">
@@ -560,7 +775,8 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
                     <div className="pt-3 border-t border-slate-200">
                       <span className="text-[11px] text-slate-400 italic flex items-center gap-1">
                         <MapPin className="w-3 h-3" />
-                        Not assigned to any branch — handles the general IT queue.
+                        Not assigned to any branch — handles the general IT
+                        queue.
                       </span>
                     </div>
                   )}
@@ -572,15 +788,19 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
       )}
 
       {/* Branches Tab */}
-      {activeTab === 'branches' && (
+      {activeTab === "branches" && (
         <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
           <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
-            <h3 className="font-bold text-slate-900 text-sm">Bayanihan Bank Branches Directory</h3>
+            <h3 className="font-bold text-slate-900 text-sm">
+              Bayanihan Bank Branches Directory
+            </h3>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-500">{branches.length} bank locations</span>
+              <span className="text-xs text-slate-500">
+                {branches.length} bank locations
+              </span>
               {canManage && (
                 <button
-                  onClick={() => setBranchModal({ mode: 'create' })}
+                  onClick={() => setBranchModal({ mode: "create" })}
                   className="px-3 py-1.5 bg-indigo-700 hover:bg-indigo-600 text-white font-bold text-[11px] rounded-lg transition flex items-center gap-1.5 cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
@@ -604,25 +824,39 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
                 <tr key={b.id} className="hover:bg-slate-50">
                   <td className="p-3 font-bold text-slate-900">{b.name}</td>
                   <td className="p-3 text-slate-600">{b.location}</td>
-                  <td className="p-3 text-slate-700 font-medium">{b.userCount} users</td>
+                  <td className="p-3 text-slate-700 font-medium">
+                    {b.userCount} users
+                  </td>
                   <td className="p-3">
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                      b.status === 'Active' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'
-                    }`}>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        b.status === "Active"
+                          ? "bg-emerald-100 text-emerald-800"
+                          : "bg-slate-200 text-slate-600"
+                      }`}
+                    >
                       {b.status}
                     </span>
                   </td>
                   {canManage && (
                     <td className="p-3 text-right whitespace-nowrap">
                       <button
-                        onClick={() => setBranchModal({ mode: 'edit', branch: b })}
+                        onClick={() =>
+                          setBranchModal({ mode: "edit", branch: b })
+                        }
                         className="p-1.5 rounded bg-slate-100 hover:bg-indigo-700 hover:text-white text-slate-600 transition inline-flex cursor-pointer"
                         title="Edit branch"
                       >
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
                       <button
-                        onClick={() => setDeleteTarget({ type: 'branch', id: b.id, name: b.name })}
+                        onClick={() =>
+                          setDeleteTarget({
+                            type: "branch",
+                            id: b.id,
+                            name: b.name,
+                          })
+                        }
                         className="p-1.5 rounded bg-slate-100 hover:bg-red-700 hover:text-white text-slate-600 transition inline-flex ml-1 cursor-pointer"
                         title="Delete branch"
                       >
@@ -638,17 +872,22 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
       )}
 
       {/* Categories Tab */}
-      {activeTab === 'categories' && (
+      {activeTab === "categories" && (
         <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
           <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
-            <h3 className="font-bold text-slate-900 text-sm">IT Request Categories Taxonomy</h3>
+            <h3 className="font-bold text-slate-900 text-sm">
+              IT Request Categories Taxonomy
+            </h3>
             <span className="text-xs text-amber-700 bg-amber-50 px-2 py-0.5 rounded font-semibold border border-amber-200">
               Taxonomy: TBD — For Confirmation
             </span>
           </div>
           <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
             {categories.map((c) => (
-              <div key={c.id} className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+              <div
+                key={c.id}
+                className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-1"
+              >
                 <div className="flex items-center justify-between">
                   <h4 className="font-bold text-slate-900 text-sm">{c.name}</h4>
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">
@@ -663,14 +902,21 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
       )}
 
       {/* Activity Logs Tab */}
-      {activeTab === 'activity_logs' && (
+      {activeTab === "activity_logs" && (
         <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm space-y-3 p-4">
           <div className="flex items-center justify-between border-b border-slate-200 pb-3">
             <div>
-              <h3 className="font-bold text-slate-900 text-sm">System Audit Activity Logs</h3>
-              <p className="text-xs text-slate-500">Traceability log for ticket events, status updates, and user actions</p>
+              <h3 className="font-bold text-slate-900 text-sm">
+                System Audit Activity Logs
+              </h3>
+              <p className="text-xs text-slate-500">
+                Traceability log for ticket events, status updates, and user
+                actions
+              </p>
             </div>
-            <span className="text-xs text-slate-400 font-mono">{auditLogs.length} entries</span>
+            <span className="text-xs text-slate-400 font-mono">
+              {auditLogs.length} entries
+            </span>
           </div>
 
           <div className="space-y-2">
@@ -692,7 +938,9 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
                 </div>
 
                 <div className="text-right text-[10px] text-slate-500 font-mono shrink-0">
-                  <div>By {log.actorName} ({log.actorRole})</div>
+                  <div>
+                    By {log.actorName} ({log.actorRole})
+                  </div>
                   <div>{log.timestamp}</div>
                 </div>
               </div>
@@ -707,7 +955,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
           mode={userModal.mode}
           initial={userModal.user}
           branches={branches}
-          currentUserId={users.find((x) => x.role === 'ADMINISTRATOR')?.id}
+          currentUserId={users.find((x) => x.role === "ADMINISTRATOR")?.id}
           onClose={() => setUserModal(null)}
           onSubmit={handleUserFormSubmit}
         />
@@ -760,53 +1008,59 @@ function UserFormModal({
   onClose,
   onSubmit,
 }: {
-  mode: 'create' | 'edit';
+  mode: "create" | "edit";
   initial?: User;
   branches: Branch[];
   currentUserId?: string;
   onClose: () => void;
   onSubmit: (form: UserFormState) => void;
 }) {
-  const isEdit = mode === 'edit';
+  const isEdit = mode === "edit";
   const [form, setForm] = useState<UserFormState>(() => ({
     id: initial?.id,
-    name: initial?.name || '',
-    username: initial?.username || '',
-    role: initial?.role || 'BRANCH_USER',
-    email: initial?.email || '',
+    name: initial?.name || "",
+    username: initial?.username || "",
+    role: initial?.role || "BRANCH_USER",
+    email: initial?.email || "",
     branchId: initial?.branchId || branches[0]?.id,
-    branchName: initial?.branchName || (branches[0] ? branches[0].name : ''),
-    department: initial?.department || '',
-    password: '',
+    branchName: initial?.branchName || (branches[0] ? branches[0].name : ""),
+    department: initial?.department || "",
+    password: "",
   }));
 
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
   const handleBranchChange = (branchId: string) => {
     const b = branches.find((x) => x.id === branchId);
-    setForm((f) => ({ ...f, branchId, branchName: b?.name || '' }));
+    setForm((f) => ({ ...f, branchId, branchName: b?.name || "" }));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim() || !form.username.trim() || !form.email.trim()) {
-      setError('Please fill in all required fields.');
+      setError("Please fill in all required fields.");
       return;
     }
-    if (form.role === 'BRANCH_USER' && !form.branchId) {
-      setError('Please select a branch for this user.');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+    if (form.role === "BRANCH_USER" && !form.branchId) {
+      setError("Please select a branch for this user.");
       return;
     }
     if (form.password && form.password.length < 6) {
-      setError('Password must be at least 6 characters long.');
+      setError("Password must be at least 6 characters long.");
       return;
     }
     onSubmit(form);
   };
 
-  const inputClass = 'w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:bg-white transition';
-  const labelClass = 'block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1';
+  const inputClass =
+    "w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:bg-white transition";
+  const labelClass =
+    "block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1";
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
@@ -814,9 +1068,12 @@ function UserFormModal({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-purple-900 font-bold text-base">
             <Users className="w-5 h-5 text-purple-600" />
-            <span>{isEdit ? 'Edit User Account' : 'Create User Account'}</span>
+            <span>{isEdit ? "Edit User Account" : "Create User Account"}</span>
           </div>
-          <button onClick={onClose} className="p-1 rounded hover:bg-slate-100 text-slate-500 cursor-pointer">
+          <button
+            onClick={onClose}
+            className="p-1 rounded hover:bg-slate-100 text-slate-500 cursor-pointer"
+          >
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -825,8 +1082,9 @@ function UserFormModal({
           <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs">
             <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-amber-600" />
             <span>
-              This user has <strong>requested a password reset</strong>. Set a new
-              password below so they can log in again — the badge clears once you save one.
+              This user has <strong>requested a password reset</strong>. Set a
+              new password below so they can log in again — the badge clears
+              once you save one.
             </span>
           </div>
         )}
@@ -834,52 +1092,70 @@ function UserFormModal({
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
-              <label className={labelClass}>Full Name <span className="text-red-500">*</span></label>
+              <label className={labelClass}>
+                Full Name <span className="text-red-500">*</span>
+              </label>
               <input
                 type="text"
                 required
                 value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, name: e.target.value }))
+                }
                 placeholder="e.g. Maria Santos"
                 className={inputClass}
               />
             </div>
 
             <div>
-              <label className={labelClass}>Username <span className="text-red-500">*</span></label>
+              <label className={labelClass}>
+                Username <span className="text-red-500">*</span>
+              </label>
               <input
                 type="text"
                 required
                 value={form.username}
-                onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, username: e.target.value }))
+                }
                 placeholder="e.g. maria.santos"
                 className={inputClass}
               />
             </div>
 
             <div>
-              <label className={labelClass}>Role <span className="text-red-500">*</span></label>
+              <label className={labelClass}>
+                Role <span className="text-red-500">*</span>
+              </label>
               <select
                 value={form.role}
-                onChange={(e) => setForm((f) => ({ ...f, role: e.target.value as UserRole }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, role: e.target.value as UserRole }))
+                }
                 className={inputClass}
               >
                 {ROLE_OPTIONS.map((r) => (
-                  <option key={r.value} value={r.value}>{r.label}</option>
+                  <option key={r.value} value={r.value}>
+                    {r.label}
+                  </option>
                 ))}
               </select>
             </div>
 
-            {form.role === 'BRANCH_USER' ? (
+            {form.role === "BRANCH_USER" ? (
               <div className="col-span-2">
-                <label className={labelClass}>Branch <span className="text-red-500">*</span></label>
+                <label className={labelClass}>
+                  Branch <span className="text-red-500">*</span>
+                </label>
                 <select
-                  value={form.branchId || ''}
+                  value={form.branchId || ""}
                   onChange={(e) => handleBranchChange(e.target.value)}
                   className={inputClass}
                 >
                   {branches.map((b) => (
-                    <option key={b.id} value={b.id}>{b.name}</option>
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -888,21 +1164,33 @@ function UserFormModal({
                 <label className={labelClass}>Department</label>
                 <input
                   type="text"
-                  value={form.department || ''}
-                  onChange={(e) => setForm((f) => ({ ...f, department: e.target.value }))}
-                  placeholder={form.role === 'IT_STAFF' ? 'Main IT Department' : form.role === 'AUDITOR' ? 'Internal Audit Department' : 'System Administration'}
+                  value={form.department || ""}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, department: e.target.value }))
+                  }
+                  placeholder={
+                    form.role === "IT_STAFF"
+                      ? "Main IT Department"
+                      : form.role === "AUDITOR"
+                        ? "Internal Audit Department"
+                        : "System Administration"
+                  }
                   className={inputClass}
                 />
               </div>
             )}
 
             <div className="col-span-2">
-              <label className={labelClass}>Email <span className="text-red-500">*</span></label>
+              <label className={labelClass}>
+                Email <span className="text-red-500">*</span>
+              </label>
               <input
                 type="email"
                 required
                 value={form.email}
-                onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, email: e.target.value }))
+                }
                 placeholder="e.g. maria.santos@bayanihanbank.demo"
                 className={inputClass}
               />
@@ -910,41 +1198,56 @@ function UserFormModal({
 
             <div className="col-span-2">
               <label className={labelClass}>
-                {isEdit ? 'New Password (leave blank to keep current)' : 'Initial Password'}
+                {isEdit
+                  ? "New Password (leave blank to keep current)"
+                  : "Initial Password"}
               </label>
               <div className="relative">
                 <input
-                  type={showPassword ? 'text' : 'password'}
+                  type={showPassword ? "text" : "password"}
                   value={form.password}
-                  onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-                  placeholder={isEdit ? '••••••••' : `Default: password123 (min 6 chars)`}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, password: e.target.value }))
+                  }
+                  placeholder={
+                    isEdit ? "••••••••" : `Default: password123 (min 6 chars)`
+                  }
                   className={`${inputClass} pr-10`}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
                   className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-slate-200 text-slate-500 cursor-pointer"
-                  title={showPassword ? 'Hide password' : 'Show password'}
+                  title={showPassword ? "Hide password" : "Show password"}
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
                 </button>
               </div>
               <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
                 {isEdit
-                  ? 'Setting a new password forces the user to change it on their next login.'
-                  : 'If left blank, the default password is password123. The user must change it on first login.'}
+                  ? "Setting a new password forces the user to change it on their next login."
+                  : "If left blank, the default password is password123. The user must change it on first login."}
               </p>
             </div>
           </div>
 
           {error && (
-            <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs">{error}</div>
+            <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs">
+              {error}
+            </div>
           )}
 
           {isEdit && form.id === currentUserId && (
             <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-[11px] flex items-start gap-1.5">
               <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-              <span>This is the currently logged-in administrator. Role and deletion cannot be changed for this account.</span>
+              <span>
+                This is the currently logged-in administrator. Role and deletion
+                cannot be changed for this account.
+              </span>
             </div>
           )}
 
@@ -960,7 +1263,7 @@ function UserFormModal({
               type="submit"
               className="px-5 py-2 bg-purple-700 hover:bg-purple-600 text-white font-bold text-xs rounded-lg transition shadow-md cursor-pointer"
             >
-              {isEdit ? 'Save Changes' : 'Create Account'}
+              {isEdit ? "Save Changes" : "Create Account"}
             </button>
           </div>
         </form>
@@ -979,33 +1282,35 @@ function BranchFormModal({
   onClose,
   onSubmit,
 }: {
-  mode: 'create' | 'edit';
+  mode: "create" | "edit";
   initial?: Branch;
   onClose: () => void;
   onSubmit: (form: BranchFormState) => void;
 }) {
-  const isEdit = mode === 'edit';
+  const isEdit = mode === "edit";
   const [form, setForm] = useState<BranchFormState>(() => ({
     id: initial?.id,
-    name: initial?.name || '',
-    location: initial?.location || '',
-    status: initial?.status || 'Active',
+    name: initial?.name || "",
+    location: initial?.location || "",
+    status: initial?.status || "Active",
     userCount: initial?.userCount ?? 0,
   }));
 
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim() || !form.location.trim()) {
-      setError('Please fill in all required fields.');
+      setError("Please fill in all required fields.");
       return;
     }
     onSubmit(form);
   };
 
-  const inputClass = 'w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:bg-white transition';
-  const labelClass = 'block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1';
+  const inputClass =
+    "w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:bg-white transition";
+  const labelClass =
+    "block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1";
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
@@ -1013,9 +1318,12 @@ function BranchFormModal({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-indigo-900 font-bold text-base">
             <Building className="w-5 h-5 text-indigo-600" />
-            <span>{isEdit ? 'Edit Branch' : 'Add Branch'}</span>
+            <span>{isEdit ? "Edit Branch" : "Add Branch"}</span>
           </div>
-          <button onClick={onClose} className="p-1 rounded hover:bg-slate-100 text-slate-500 cursor-pointer">
+          <button
+            onClick={onClose}
+            className="p-1 rounded hover:bg-slate-100 text-slate-500 cursor-pointer"
+          >
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -1026,7 +1334,12 @@ function BranchFormModal({
               <label className={labelClass}>Status</label>
               <select
                 value={form.status}
-                onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as 'Active' | 'Inactive' }))}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    status: e.target.value as "Active" | "Inactive",
+                  }))
+                }
                 className={inputClass}
               >
                 <option value="Active">Active</option>
@@ -1035,24 +1348,32 @@ function BranchFormModal({
             </div>
 
             <div className="col-span-2">
-              <label className={labelClass}>Branch Name <span className="text-red-500">*</span></label>
+              <label className={labelClass}>
+                Branch Name <span className="text-red-500">*</span>
+              </label>
               <input
                 type="text"
                 required
                 value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, name: e.target.value }))
+                }
                 placeholder="e.g. Tiaong Branch"
                 className={inputClass}
               />
             </div>
 
             <div className="col-span-2">
-              <label className={labelClass}>Location <span className="text-red-500">*</span></label>
+              <label className={labelClass}>
+                Location <span className="text-red-500">*</span>
+              </label>
               <input
                 type="text"
                 required
                 value={form.location}
-                onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, location: e.target.value }))
+                }
                 placeholder="e.g. Tiaong, Quezon"
                 className={inputClass}
               />
@@ -1064,14 +1385,21 @@ function BranchFormModal({
                 type="number"
                 min={0}
                 value={form.userCount}
-                onChange={(e) => setForm((f) => ({ ...f, userCount: Number(e.target.value) || 0 }))}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    userCount: Number(e.target.value) || 0,
+                  }))
+                }
                 className={inputClass}
               />
             </div>
           </div>
 
           {error && (
-            <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs">{error}</div>
+            <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs">
+              {error}
+            </div>
           )}
 
           <div className="flex justify-end gap-2 pt-2 border-t border-slate-200">
@@ -1086,7 +1414,7 @@ function BranchFormModal({
               type="submit"
               className="px-5 py-2 bg-indigo-700 hover:bg-indigo-600 text-white font-bold text-xs rounded-lg transition shadow-md cursor-pointer"
             >
-              {isEdit ? 'Save Changes' : 'Add Branch'}
+              {isEdit ? "Save Changes" : "Add Branch"}
             </button>
           </div>
         </form>
@@ -1101,9 +1429,15 @@ function BranchFormModal({
 
 const DURATION_OPTIONS = [1, 2, 3, 4, 5, 6, 9, 12];
 
-function buildAssignment(branchId: string, branchName: string, durationMonths: number): BranchAssignment {
+function buildAssignment(
+  branchId: string,
+  branchName: string,
+  durationMonths: number,
+): BranchAssignment {
   const assignedAt = new Date();
-  const expiresAt = new Date(assignedAt.getTime() + durationMonths * 30 * 24 * 60 * 60 * 1000);
+  const expiresAt = new Date(
+    assignedAt.getTime() + durationMonths * 30 * 24 * 60 * 60 * 1000,
+  );
   return {
     branchId,
     branchName,
@@ -1164,14 +1498,18 @@ function StaffAssignmentModal({
             <MapPin className="w-5 h-5 text-sky-600" />
             <span>Assign Branches — {staff.name}</span>
           </div>
-          <button onClick={onClose} className="p-1 rounded hover:bg-slate-100 text-slate-500 cursor-pointer">
+          <button
+            onClick={onClose}
+            className="p-1 rounded hover:bg-slate-100 text-slate-500 cursor-pointer"
+          >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         <p className="text-xs text-slate-600 leading-relaxed">
-          Select which branch(es) this IT specialist member is assigned to and set how long each assignment lasts.
-          Expired assignments appear in red on the roster.
+          Select which branch(es) this IT specialist member is assigned to and
+          set how long each assignment lasts. Expired assignments appear in red
+          on the roster.
         </p>
 
         <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
@@ -1181,7 +1519,9 @@ function StaffAssignmentModal({
               <div
                 key={b.id}
                 className={`p-3 rounded-xl border transition flex flex-col sm:flex-row sm:items-center gap-3 ${
-                  checked ? 'bg-sky-50/70 border-sky-300' : 'bg-slate-50 border-slate-200'
+                  checked
+                    ? "bg-sky-50/70 border-sky-300"
+                    : "bg-slate-50 border-slate-200"
                 }`}
               >
                 <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -1192,7 +1532,9 @@ function StaffAssignmentModal({
                     className="w-4 h-4 rounded text-sky-600 focus:ring-emerald-500 cursor-pointer"
                   />
                   <div className="min-w-0">
-                    <div className="font-bold text-slate-900 text-sm">{b.name}</div>
+                    <div className="font-bold text-slate-900 text-sm">
+                      {b.name}
+                    </div>
                     <div className="text-[11px] text-slate-500">
                       {b.location}
                     </div>
@@ -1204,12 +1546,14 @@ function StaffAssignmentModal({
                     <CalendarClock className="w-3.5 h-3.5 text-sky-600" />
                     <select
                       value={selections[b.id]}
-                      onChange={(e) => setDuration(b.id, Number(e.target.value))}
+                      onChange={(e) =>
+                        setDuration(b.id, Number(e.target.value))
+                      }
                       className="px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-lg text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
                     >
                       {DURATION_OPTIONS.map((m) => (
                         <option key={m} value={m}>
-                          {m} month{m > 1 ? 's' : ''}
+                          {m} month{m > 1 ? "s" : ""}
                         </option>
                       ))}
                     </select>
@@ -1222,7 +1566,8 @@ function StaffAssignmentModal({
 
         {selectedCount > 0 && (
           <div className="p-3 bg-sky-50 border border-sky-200 rounded-xl text-xs text-sky-900">
-            <strong>{selectedCount}</strong> branch{selectedCount > 1 ? 'es' : ''} selected. Assignments will take
+            <strong>{selectedCount}</strong> branch
+            {selectedCount > 1 ? "es" : ""} selected. Assignments will take
             effect immediately and show the expiry date on the roster.
           </div>
         )}
@@ -1267,9 +1612,11 @@ function DeleteConfirmModal({
           <span>Confirm Deletion</span>
         </div>
         <p className="text-xs text-slate-600 leading-relaxed">
-          Are you sure you want to delete{' '}
+          Are you sure you want to delete{" "}
           <strong className="text-slate-900">
-            {target.type === 'user' ? `user ${target.name}` : `branch "${target.name}"`}
+            {target.type === "user"
+              ? `user ${target.name}`
+              : `branch "${target.name}"`}
           </strong>
           ? This action will be recorded in the audit log.
         </p>

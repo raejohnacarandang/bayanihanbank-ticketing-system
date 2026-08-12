@@ -1,11 +1,26 @@
-import React, { useState } from 'react';
-import { BayanihanLogo } from '../components/BayanihanLogo';
-import { ShieldCheck, Lock, User as UserIcon, AlertCircle, ArrowRight, Eye, EyeOff, X, KeyRound } from 'lucide-react';
+import React, { useState } from "react";
+import { BayanihanLogo } from "../components/BayanihanLogo";
+import {
+  ShieldCheck,
+  Lock,
+  User as UserIcon,
+  AlertCircle,
+  ArrowRight,
+  Eye,
+  EyeOff,
+  X,
+  KeyRound,
+} from "lucide-react";
 
 interface LoginViewProps {
   onLogin: (username: string, password: string) => Promise<void>;
-  onRequestPasswordReset?: (username: string) => Promise<{ requiresRecoveryKey?: boolean }>;
-  onAdminRecovery?: (username: string, key: string) => Promise<{ oneTimePassword: string }>;
+  onRequestPasswordReset?: (
+    username: string,
+  ) => Promise<{ requiresRecoveryKey?: boolean }>;
+  onAdminRecovery?: (
+    username: string,
+    key: string,
+  ) => Promise<{ oneTimePassword: string }>;
 }
 
 interface SavedAccount {
@@ -13,7 +28,7 @@ interface SavedAccount {
   password: string;
 }
 
-const SAVED_ACCOUNTS_KEY = 'bb_saved_creds';
+const SAVED_ACCOUNTS_KEY = "bb_saved_creds";
 const MAX_SAVED_ACCOUNTS = 5;
 
 const readSavedAccounts = (): SavedAccount[] => {
@@ -23,7 +38,7 @@ const readSavedAccounts = (): SavedAccount[] => {
     const parsed = JSON.parse(raw) as SavedAccount | SavedAccount[];
     const list = Array.isArray(parsed) ? parsed : [parsed];
     return list.filter(
-      (a) => a && typeof a.username === 'string' && a.username.length > 0
+      (a) => a && typeof a.username === "string" && a.username.length > 0,
     );
   } catch {
     return [];
@@ -34,75 +49,88 @@ const writeSavedAccounts = (accounts: SavedAccount[]): void => {
   localStorage.setItem(SAVED_ACCOUNTS_KEY, JSON.stringify(accounts));
 };
 
-export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRequestPasswordReset, onAdminRecovery }) => {
-  const [savedAccounts, setSavedAccounts] = useState<SavedAccount[]>(() => readSavedAccounts());
-  const [username, setUsername] = useState(savedAccounts[0]?.username ?? '');
-  const [password, setPassword] = useState(savedAccounts[0]?.password ?? '');
+export const LoginView: React.FC<LoginViewProps> = ({
+  onLogin,
+  onRequestPasswordReset,
+  onAdminRecovery,
+}) => {
+  const [savedAccounts, setSavedAccounts] = useState<SavedAccount[]>(() =>
+    readSavedAccounts(),
+  );
+  const [username, setUsername] = useState(savedAccounts[0]?.username ?? "");
+  const [password, setPassword] = useState(savedAccounts[0]?.password ?? "");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
-  const [errorMessage, setErrorMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState("");
   const [showForgotModal, setShowForgotModal] = useState(false);
-  const [resetUsername, setResetUsername] = useState('');
-  const [resetStatus, setResetStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
-  const [resetMessage, setResetMessage] = useState('');
-  const [recoveryKey, setRecoveryKey] = useState('');
-  const [oneTimePassword, setOneTimePassword] = useState('');
+  const [resetUsername, setResetUsername] = useState("");
+  const [resetStatus, setResetStatus] = useState<
+    "idle" | "submitting" | "success" | "error"
+  >("idle");
+  const [resetMessage, setResetMessage] = useState("");
+  const [recoveryKey, setRecoveryKey] = useState("");
+  const [oneTimePassword, setOneTimePassword] = useState("");
   const [recoveryMode, setRecoveryMode] = useState(false);
 
   const submitResetRequest = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!resetUsername.trim() || resetStatus === 'submitting') return;
-    setResetStatus('submitting');
-    setResetMessage('');
+    if (!resetUsername.trim() || resetStatus === "submitting") return;
+    setResetStatus("submitting");
+    setResetMessage("");
     try {
-      if (!onRequestPasswordReset) throw new Error('unavailable');
+      if (!onRequestPasswordReset) throw new Error("unavailable");
       const res = await onRequestPasswordReset(resetUsername.trim());
       if (res?.requiresRecoveryKey) {
         setRecoveryMode(true);
-        setResetStatus('idle');
+        setResetStatus("idle");
         setResetMessage(
-          'This is an administrator account. Enter the recovery key issued to the IT operations team.'
+          "This is an administrator account. Enter the recovery key issued to the IT operations team.",
         );
         return;
       }
-      setResetStatus('success');
-      setResetMessage('Reset request submitted. Your IT administrator will set a new password for you.');
-    } catch {
-      setResetStatus('error');
+      setResetStatus("success");
       setResetMessage(
-        'No account found with that username. Please check and try again, or contact the IT Helpdesk.'
+        "Reset request submitted. Your IT administrator will set a new password for you.",
+      );
+    } catch {
+      setResetStatus("error");
+      setResetMessage(
+        "No account found with that username. Please check and try again, or contact the IT Helpdesk.",
       );
     }
   };
 
   const submitRecovery = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!recoveryKey.trim() || resetStatus === 'submitting') return;
-    setResetStatus('submitting');
-    setResetMessage('');
+    if (!recoveryKey.trim() || resetStatus === "submitting") return;
+    setResetStatus("submitting");
+    setResetMessage("");
     try {
-      if (!onAdminRecovery) throw new Error('unavailable');
-      const res = await onAdminRecovery(resetUsername.trim(), recoveryKey.trim());
+      if (!onAdminRecovery) throw new Error("unavailable");
+      const res = await onAdminRecovery(
+        resetUsername.trim(),
+        recoveryKey.trim(),
+      );
       setOneTimePassword(res.oneTimePassword);
-      setResetStatus('success');
+      setResetStatus("success");
       setResetMessage(
-        'Password reset. Sign in with the one-time password below — you will be required to set a new password on first login.'
+        "Password reset. Sign in with the one-time password below — you will be required to set a new password on first login.",
       );
     } catch {
-      setResetStatus('error');
+      setResetStatus("error");
       setResetMessage(
-        'Recovery failed. Check the recovery key or contact the IT operations team.'
+        "Recovery failed. Check the recovery key or contact the IT operations team.",
       );
     }
   };
 
   const closeForgotModal = () => {
     setShowForgotModal(false);
-    setResetStatus('idle');
-    setResetMessage('');
-    setResetUsername('');
-    setRecoveryKey('');
-    setOneTimePassword('');
+    setResetStatus("idle");
+    setResetMessage("");
+    setResetUsername("");
+    setRecoveryKey("");
+    setOneTimePassword("");
     setRecoveryMode(false);
   };
 
@@ -118,12 +146,12 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRequestPassword
   };
 
   const performLogin = async (user: string, pass: string) => {
-    setErrorMessage('');
+    setErrorMessage("");
     try {
       await onLogin(user, pass);
       if (rememberMe) saveAccount(user, pass);
     } catch {
-      setErrorMessage('Invalid username or password.');
+      setErrorMessage("Invalid username or password.");
     }
   };
 
@@ -135,21 +163,23 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRequestPassword
 
   const handleRemoveAccount = (acctUsername: string) => {
     setSavedAccounts((prev) => {
-      const next = prev.filter((a) => a.username.toLowerCase() !== acctUsername.toLowerCase());
+      const next = prev.filter(
+        (a) => a.username.toLowerCase() !== acctUsername.toLowerCase(),
+      );
       writeSavedAccounts(next);
       return next;
     });
     if (username.toLowerCase() === acctUsername.toLowerCase()) {
-      setUsername('');
-      setPassword('');
+      setUsername("");
+      setPassword("");
     }
   };
 
   const handleClearAllSaved = () => {
     localStorage.removeItem(SAVED_ACCOUNTS_KEY);
     setSavedAccounts([]);
-    setUsername('');
-    setPassword('');
+    setUsername("");
+    setPassword("");
   };
 
   const handleLoginSubmit = (e: React.FormEvent) => {
@@ -164,7 +194,11 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRequestPassword
         {/* Bank Brand Identity Header */}
         <div className="text-center space-y-3">
           <div className="flex justify-center">
-            <BayanihanLogo size="xl" showSubtitle subtitleText="IT Service Desk Portal" />
+            <BayanihanLogo
+              size="xl"
+              showSubtitle
+              subtitleText="IT Service Desk Portal"
+            />
           </div>
           <p className="text-xs text-emerald-200/80 max-w-xs mx-auto leading-relaxed">
             Centralized IT Support & Service Management for Branches and Main IT
@@ -257,7 +291,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRequestPassword
               <div className="relative">
                 <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                 <input
-                  type={showPassword ? 'text' : 'password'}
+                  type={showPassword ? "text" : "password"}
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -268,10 +302,14 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRequestPassword
                   type="button"
                   onClick={() => setShowPassword((s) => !s)}
                   className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-emerald-700 transition cursor-pointer"
-                  title={showPassword ? 'Hide password' : 'Show password'}
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  title={showPassword ? "Hide password" : "Show password"}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
                 </button>
               </div>
             </div>
@@ -325,10 +363,12 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRequestPassword
               </button>
             </div>
 
-            {resetStatus === 'success' ? (
+            {resetStatus === "success" ? (
               <div className="space-y-3">
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  <strong className="text-emerald-700">Request received.</strong>{' '}
+                  <strong className="text-emerald-700">
+                    Request received.
+                  </strong>{" "}
                   {resetMessage}
                 </p>
                 {oneTimePassword && (
@@ -340,7 +380,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRequestPassword
                       {oneTimePassword}
                     </p>
                     <p className="text-[10px] text-emerald-700 leading-relaxed">
-                      Copy it now — it is shown only once. You will be forced to set a new password on first login.
+                      Copy it now — it is shown only once. You will be forced to
+                      set a new password on first login.
                     </p>
                   </div>
                 )}
@@ -356,7 +397,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRequestPassword
                 <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs">
                   <KeyRound className="w-4 h-4 shrink-0" />
                   <span>
-                    Account <strong>{resetUsername}</strong> is an administrator. Enter the recovery key.
+                    Account <strong>{resetUsername}</strong> is an
+                    administrator. Enter the recovery key.
                   </span>
                 </div>
                 <div className="relative">
@@ -370,7 +412,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRequestPassword
                     className="w-full pl-9 pr-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
                   />
                 </div>
-                {resetStatus === 'error' && (
+                {resetStatus === "error" && (
                   <div className="flex items-start gap-2 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs">
                     <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                     <span>{resetMessage}</span>
@@ -381,8 +423,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRequestPassword
                     type="button"
                     onClick={() => {
                       setRecoveryMode(false);
-                      setResetStatus('idle');
-                      setResetMessage('');
+                      setResetStatus("idle");
+                      setResetMessage("");
                     }}
                     className="px-3 py-2 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
                   >
@@ -390,10 +432,14 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRequestPassword
                   </button>
                   <button
                     type="submit"
-                    disabled={!recoveryKey.trim() || resetStatus === 'submitting'}
+                    disabled={
+                      !recoveryKey.trim() || resetStatus === "submitting"
+                    }
                     className="flex-1 py-2 bg-emerald-950 text-white font-semibold text-xs rounded-lg hover:bg-emerald-900 transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                   >
-                    {resetStatus === 'submitting' ? 'Resetting…' : 'Reset Password'}
+                    {resetStatus === "submitting"
+                      ? "Resetting…"
+                      : "Reset Password"}
                   </button>
                 </div>
               </form>
@@ -401,7 +447,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRequestPassword
               <form onSubmit={submitResetRequest} className="space-y-3">
                 <p className="text-xs text-slate-600 leading-relaxed">
                   Enter the username for your Bayanihan Bank account. Your IT
-                  administrator will be notified and will issue you a new password.
+                  administrator will be notified and will issue you a new
+                  password.
                 </p>
                 <div className="relative">
                   <UserIcon className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -414,7 +461,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRequestPassword
                     className="w-full pl-9 pr-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
                   />
                 </div>
-                {resetStatus === 'error' && (
+                {resetStatus === "error" && (
                   <div className="flex items-start gap-2 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs">
                     <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                     <span>{resetMessage}</span>
@@ -422,10 +469,14 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRequestPassword
                 )}
                 <button
                   type="submit"
-                  disabled={!resetUsername.trim() || resetStatus === 'submitting'}
+                  disabled={
+                    !resetUsername.trim() || resetStatus === "submitting"
+                  }
                   className="w-full py-2 bg-emerald-950 text-white font-semibold text-xs rounded-lg hover:bg-emerald-900 transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                 >
-                  {resetStatus === 'submitting' ? 'Submitting…' : 'Submit Reset Request'}
+                  {resetStatus === "submitting"
+                    ? "Submitting…"
+                    : "Submit Reset Request"}
                 </button>
               </form>
             )}
@@ -435,7 +486,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRequestPassword
 
       {/* Footer Disclaimer */}
       <footer className="text-center text-emerald-300/70 text-[11px] py-4 border-t border-emerald-900/80">
-        Bayanihan Bank IT Service Desk (August 7, 2026)
+        Bayanihan Bank © 2026
       </footer>
     </div>
   );

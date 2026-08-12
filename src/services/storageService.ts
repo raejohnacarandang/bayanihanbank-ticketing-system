@@ -21,8 +21,8 @@ import {
   TimelineEvent,
   NotificationItem,
   AuditLog,
-  User
-} from '../types';
+  User,
+} from "../types";
 import {
   addComment as localAddComment,
   assignTicket as localAssignTicket,
@@ -38,17 +38,18 @@ import {
   updateTicketStatus as localUpdateTicketStatus,
   updateStaffAssignments as localUpdateStaffAssignments,
   updateUser as localUpdateUser,
-} from './store';
+} from "./store";
 import type {
   CreateBranchParams,
   CreateUserParams,
   UpdateUserChanges,
-} from './store';
+} from "./store";
 
-const CACHE_KEY = 'bb_it_state_v2';
-const TOKEN_KEY = 'bb_it_token';
+const CACHE_KEY = "bb_it_state_v2";
+const TOKEN_KEY = "bb_it_token";
+const CSRF_KEY = "bb_it_csrf";
 /** Demo credentials used for offline fallback and the role switcher. */
-const DEMO_PASSWORD = 'password123';
+const DEMO_PASSWORD = "password123";
 
 /** API error carrying the HTTP status when one was received. */
 class ApiError extends Error {
@@ -62,6 +63,7 @@ class ApiError extends Error {
 class StorageService {
   private cache: AppState;
   private token: string | null = localStorage.getItem(TOKEN_KEY);
+  private csrfToken: string | null = localStorage.getItem(CSRF_KEY);
 
   constructor() {
     this.cache = this.loadFromLocal();
@@ -92,36 +94,89 @@ class StorageService {
     localStorage.removeItem(TOKEN_KEY);
   }
 
-  private async api<T = unknown>(path: string, options?: RequestInit): Promise<T> {
+  /**
+   * Obtain a CSRF token from the server. The token is issued as an HttpOnly
+   * cookie plus an `X-CSRF-Token` response header on every safe request, so we
+   * grab it from a lightweight unauthenticated endpoint and echo it back as an
+   * `x-csrf-token` header on state-changing requests (the SPA usage documented
+   * in src/server/csrf.ts).
+   */
+  private async ensureCsrfToken(): Promise<void> {
+    if (this.csrfToken) return;
+    try {
+      const res = await fetch("/api/health");
+      const token = res.headers.get("X-CSRF-Token");
+      if (token) {
+        this.csrfToken = token;
+        localStorage.setItem(CSRF_KEY, token);
+      }
+    } catch {
+      // API unreachable — mutations will fall back to the local mirror.
+    }
+  }
+
+  private async api<T = unknown>(
+    path: string,
+    options?: RequestInit,
+    isRetry = false,
+  ): Promise<T> {
+    const method = (options?.method ?? "GET").toUpperCase();
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
       ...(options?.headers as Record<string, string> | undefined),
     };
-    if (this.token) headers['Authorization'] = `Bearer ${this.token}`;
+    if (this.token) headers["Authorization"] = `Bearer ${this.token}`;
+    if (!["GET", "HEAD", "OPTIONS"].includes(method)) {
+      await this.ensureCsrfToken();
+      if (this.csrfToken) headers["x-csrf-token"] = this.csrfToken;
+    }
 
     let res: Response;
     try {
       res = await fetch(path, { ...options, headers });
-    } catch (err) {
+    } catch {
       // Network failure (API unreachable).
-      throw new ApiError('Network error');
+      throw new ApiError("Network error");
+    }
+
+    const issuedCsrf = res.headers.get("X-CSRF-Token");
+    if (issuedCsrf) {
+      this.csrfToken = issuedCsrf;
+      localStorage.setItem(CSRF_KEY, issuedCsrf);
     }
 
     if (res.status === 401) {
       this.clearSession();
-      throw new ApiError('Session expired', 401);
+      throw new ApiError("Session expired", 401);
+    }
+    if (res.status === 403 && this.csrfToken && !isRetry) {
+      this.csrfToken = null;
+      localStorage.removeItem(CSRF_KEY);
+      return this.api<T>(path, options, true);
     }
     if (!res.ok) {
-      throw new ApiError(`API request failed (${res.status})`, res.status);
+      let message = `API request failed (${res.status})`;
+      try {
+        const data = (await res.json()) as { error?: string } | null;
+        if (data?.error) message = data.error;
+      } catch {
+        // non-JSON error body — keep the generic message
+      }
+      throw new ApiError(message, res.status);
     }
     return (await res.json()) as T;
+  }
+
+  /** A fetch failure with no HTTP status means the API is unreachable. */
+  private isNetworkError(err: unknown): boolean {
+    return err instanceof ApiError && err.status === undefined;
   }
 
   /** Re-fetch the role-filtered snapshot into the local mirror. */
   public async refresh(): Promise<void> {
     if (!this.token) return;
     try {
-      this.cache = await this.api<AppState>('/api/state', { method: 'GET' });
+      this.cache = await this.api<AppState>("/api/state", { method: "GET" });
       this.mirror();
     } catch {
       // Offline / API not running: keep the local mirror.
@@ -132,7 +187,9 @@ class StorageService {
   public async init(): Promise<boolean> {
     if (this.token) {
       try {
-        const me = await this.api<{ user: User }>('/api/auth/me', { method: 'GET' });
+        const me = await this.api<{ user: User }>("/api/auth/me", {
+          method: "GET",
+        });
         await this.refresh();
         this.cache.currentUser = me.user;
         this.mirror();
@@ -142,7 +199,10 @@ class StorageService {
       }
     }
     try {
-      const demo = await this.api<{ users: User[] }>('/api/auth/demo-accounts', { method: 'GET' });
+      const demo = await this.api<{ users: User[] }>(
+        "/api/auth/demo-accounts",
+        { method: "GET" },
+      );
       this.cache = { ...this.cache, users: demo.users };
       this.mirror();
     } catch {
@@ -157,10 +217,13 @@ class StorageService {
 
   public async login(username: string, password: string): Promise<User> {
     try {
-      const res = await this.api<{ token: string; user: User }>('/api/auth/login', {
-        method: 'POST',
-        body: JSON.stringify({ username, password }),
-      });
+      const res = await this.api<{ token: string; user: User }>(
+        "/api/auth/login",
+        {
+          method: "POST",
+          body: JSON.stringify({ username, password }),
+        },
+      );
       this.token = res.token;
       localStorage.setItem(TOKEN_KEY, res.token);
       this.cache.currentUser = res.user;
@@ -170,20 +233,20 @@ class StorageService {
       if (err instanceof ApiError && err.status && err.status < 500) throw err;
       // Offline / server error: allow demo accounts with the demo password.
       const matched = this.cache.users.find(
-        (u) => u.username.toLowerCase() === username.trim().toLowerCase()
+        (u) => u.username.toLowerCase() === username.trim().toLowerCase(),
       );
       if (matched && password === DEMO_PASSWORD) {
         this.cache.currentUser = matched;
         this.mirror();
         return matched;
       }
-      throw new ApiError('Invalid username or password');
+      throw new ApiError("Invalid username or password");
     }
   }
 
   public async logout(): Promise<void> {
     try {
-      await this.api('/api/auth/logout', { method: 'POST' });
+      await this.api("/api/auth/logout", { method: "POST" });
     } catch {
       // ignore — the token is discarded locally regardless
     }
@@ -192,41 +255,56 @@ class StorageService {
 
   /** Self-service password reset request (public, no session required). */
   public async requestPasswordReset(
-    username: string
+    username: string,
   ): Promise<{ requiresRecoveryKey?: boolean }> {
-    return this.api<{ requiresRecoveryKey?: boolean }>('/api/auth/reset-request', {
-      method: 'POST',
-      body: JSON.stringify({ username }),
-    });
+    return this.api<{ requiresRecoveryKey?: boolean }>(
+      "/api/auth/reset-request",
+      {
+        method: "POST",
+        body: JSON.stringify({ username }),
+      },
+    );
   }
 
   /**
    * Recovery-key password reset for administrator accounts (public). Returns
    * the one-time password issued for the account.
    */
-  public async adminRecovery(username: string, key: string): Promise<{ oneTimePassword: string }> {
-    return this.api<{ oneTimePassword: string }>('/api/auth/admin-recovery', {
-      method: 'POST',
+  public async adminRecovery(
+    username: string,
+    key: string,
+  ): Promise<{ oneTimePassword: string }> {
+    return this.api<{ oneTimePassword: string }>("/api/auth/admin-recovery", {
+      method: "POST",
       body: JSON.stringify({ username, key }),
     });
   }
 
   /** Change the signed-in user's password (verifies the current password). */
-  public async changePassword(currentPassword: string, newPassword: string): Promise<User> {
+  public async changePassword(
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<User> {
     try {
-      const json = await this.api<{ ok: boolean; user: User }>('/api/auth/password', {
-        method: 'PATCH',
-        body: JSON.stringify({ currentPassword, newPassword }),
-      });
+      const json = await this.api<{ ok: boolean; user: User }>(
+        "/api/auth/password",
+        {
+          method: "PATCH",
+          body: JSON.stringify({ currentPassword, newPassword }),
+        },
+      );
       await this.refresh();
       this.cache.currentUser = json.user;
       this.mirror();
       return json.user;
     } catch {
       // Offline best-effort: clear the forced-change flag locally.
-      this.cache.currentUser = { ...this.cache.currentUser, mustChangePassword: false };
+      this.cache.currentUser = {
+        ...this.cache.currentUser,
+        mustChangePassword: false,
+      };
       this.cache.users = this.cache.users.map((u) =>
-        u.id === this.cache.currentUser.id ? this.cache.currentUser : u
+        u.id === this.cache.currentUser.id ? this.cache.currentUser : u,
       );
       this.mirror();
       return this.cache.currentUser;
@@ -300,18 +378,21 @@ class StorageService {
   public async createTicket(params: {
     subject: string;
     description: string;
-    category: Ticket['category'];
+    category: Ticket["category"];
     attachmentName?: string;
   }): Promise<Ticket> {
     try {
-      const json = await this.api<{ ticket: Ticket }>('/api/tickets', {
-        method: 'POST',
+      const json = await this.api<{ ticket: Ticket }>("/api/tickets", {
+        method: "POST",
         body: JSON.stringify(params),
       });
       await this.refresh();
       return json.ticket;
     } catch {
-      const next = localCreateTicket(this.cache, { ...params, currentUser: this.cache.currentUser });
+      const next = localCreateTicket(this.cache, {
+        ...params,
+        currentUser: this.cache.currentUser,
+      });
       this.cache = next;
       this.mirror();
       return next.tickets[0];
@@ -321,32 +402,52 @@ class StorageService {
   public async updateTicketStatus(
     ticketId: string,
     newStatus: TicketStatus,
-    notes?: string
+    notes?: string,
   ): Promise<Ticket | undefined> {
     try {
-      const json = await this.api<{ ticket?: Ticket }>(`/api/tickets/${ticketId}/status`, {
-        method: 'PATCH',
-        body: JSON.stringify({ newStatus, notes }),
-      });
+      const json = await this.api<{ ticket?: Ticket }>(
+        `/api/tickets/${ticketId}/status`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ newStatus, notes }),
+        },
+      );
       await this.refresh();
       return json.ticket ?? this.cache.tickets.find((t) => t.id === ticketId);
     } catch {
-      this.cache = localUpdateTicketStatus(this.cache, ticketId, newStatus, this.cache.currentUser, notes);
+      this.cache = localUpdateTicketStatus(
+        this.cache,
+        ticketId,
+        newStatus,
+        this.cache.currentUser,
+        notes,
+      );
       this.mirror();
       return this.cache.tickets.find((t) => t.id === ticketId);
     }
   }
 
-  public async assignTicket(ticketId: string, staffUser: User): Promise<Ticket | undefined> {
+  public async assignTicket(
+    ticketId: string,
+    staffUser: User,
+  ): Promise<Ticket | undefined> {
     try {
-      const json = await this.api<{ ticket?: Ticket }>(`/api/tickets/${ticketId}/assign`, {
-        method: 'PATCH',
-        body: JSON.stringify({ staffUserId: staffUser.id }),
-      });
+      const json = await this.api<{ ticket?: Ticket }>(
+        `/api/tickets/${ticketId}/assign`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ staffUserId: staffUser.id }),
+        },
+      );
       await this.refresh();
       return json.ticket ?? this.cache.tickets.find((t) => t.id === ticketId);
     } catch {
-      this.cache = localAssignTicket(this.cache, ticketId, staffUser, this.cache.currentUser);
+      this.cache = localAssignTicket(
+        this.cache,
+        ticketId,
+        staffUser,
+        this.cache.currentUser,
+      );
       this.mirror();
       return this.cache.tickets.find((t) => t.id === ticketId);
     }
@@ -358,14 +459,23 @@ class StorageService {
     isInternal: boolean;
   }): Promise<Comment> {
     try {
-      const json = await this.api<{ comment: Comment }>(`/api/tickets/${params.ticketId}/comments`, {
-        method: 'POST',
-        body: JSON.stringify({ content: params.content, isInternal: params.isInternal }),
-      });
+      const json = await this.api<{ comment: Comment }>(
+        `/api/tickets/${params.ticketId}/comments`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            content: params.content,
+            isInternal: params.isInternal,
+          }),
+        },
+      );
       await this.refresh();
       return json.comment;
     } catch {
-      const next = localAddComment(this.cache, { ...params, currentUser: this.cache.currentUser });
+      const next = localAddComment(this.cache, {
+        ...params,
+        currentUser: this.cache.currentUser,
+      });
       this.cache = next;
       this.mirror();
       return next.comments[next.comments.length - 1];
@@ -374,7 +484,7 @@ class StorageService {
 
   public async markNotificationAsRead(id: string): Promise<void> {
     try {
-      await this.api(`/api/notifications/${id}/read`, { method: 'POST' });
+      await this.api(`/api/notifications/${id}/read`, { method: "POST" });
       await this.refresh();
     } catch {
       this.cache = localMarkNotificationAsRead(this.cache, id);
@@ -384,7 +494,7 @@ class StorageService {
 
   public async markAllNotificationsRead(userId: string): Promise<void> {
     try {
-      await this.api('/api/notifications/read-all', { method: 'POST' });
+      await this.api("/api/notifications/read-all", { method: "POST" });
       await this.refresh();
     } catch {
       this.cache = localMarkAllNotificationsAsRead(this.cache, userId);
@@ -394,13 +504,14 @@ class StorageService {
 
   public async createUser(user: CreateUserParams): Promise<User> {
     try {
-      const json = await this.api<{ user: User }>('/api/users', {
-        method: 'POST',
-        body: JSON.stringify({ user }),
+      const json = await this.api<{ user: User }>("/api/users", {
+        method: "POST",
+        body: JSON.stringify(user),
       });
       await this.refresh();
       return json.user;
-    } catch {
+    } catch (err) {
+      if (!this.isNetworkError(err)) throw err;
       const next = localCreateUser(this.cache, user, this.cache.currentUser);
       this.cache = next;
       this.mirror();
@@ -408,16 +519,25 @@ class StorageService {
     }
   }
 
-  public async updateUser(userId: string, changes: UpdateUserChanges): Promise<User | undefined> {
+  public async updateUser(
+    userId: string,
+    changes: UpdateUserChanges,
+  ): Promise<User | undefined> {
     try {
       const json = await this.api<{ user?: User }>(`/api/users/${userId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ changes }),
+        method: "PATCH",
+        body: JSON.stringify(changes),
       });
       await this.refresh();
       return json.user ?? this.cache.users.find((u) => u.id === userId);
-    } catch {
-      this.cache = localUpdateUser(this.cache, userId, changes, this.cache.currentUser);
+    } catch (err) {
+      if (!this.isNetworkError(err)) throw err;
+      this.cache = localUpdateUser(
+        this.cache,
+        userId,
+        changes,
+        this.cache.currentUser,
+      );
       this.mirror();
       return this.cache.users.find((u) => u.id === userId);
     }
@@ -425,10 +545,11 @@ class StorageService {
 
   public async deleteUser(userId: string): Promise<boolean> {
     try {
-      await this.api(`/api/users/${userId}`, { method: 'DELETE' });
+      await this.api(`/api/users/${userId}`, { method: "DELETE" });
       await this.refresh();
       return true;
-    } catch {
+    } catch (err) {
+      if (!this.isNetworkError(err)) throw err;
       const before = this.cache;
       this.cache = localDeleteUser(this.cache, userId, this.cache.currentUser);
       this.mirror();
@@ -438,17 +559,26 @@ class StorageService {
 
   public async updateStaffAssignments(
     staffUserId: string,
-    assignments: BranchAssignment[]
+    assignments: BranchAssignment[],
   ): Promise<User | undefined> {
     try {
-      const json = await this.api<{ user?: User }>(`/api/users/${staffUserId}/assignments`, {
-        method: 'PATCH',
-        body: JSON.stringify({ assignments }),
-      });
+      const json = await this.api<{ user?: User }>(
+        `/api/users/${staffUserId}/assignments`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ assignments }),
+        },
+      );
       await this.refresh();
       return json.user ?? this.cache.users.find((u) => u.id === staffUserId);
-    } catch {
-      this.cache = localUpdateStaffAssignments(this.cache, staffUserId, assignments, this.cache.currentUser);
+    } catch (err) {
+      if (!this.isNetworkError(err)) throw err;
+      this.cache = localUpdateStaffAssignments(
+        this.cache,
+        staffUserId,
+        assignments,
+        this.cache.currentUser,
+      );
       this.mirror();
       return this.cache.users.find((u) => u.id === staffUserId);
     }
@@ -456,30 +586,47 @@ class StorageService {
 
   public async createBranch(branch: CreateBranchParams): Promise<Branch> {
     try {
-      const json = await this.api<{ branch: Branch }>('/api/branches', {
-        method: 'POST',
-        body: JSON.stringify({ branch }),
+      const json = await this.api<{ branch: Branch }>("/api/branches", {
+        method: "POST",
+        body: JSON.stringify(branch),
       });
       await this.refresh();
       return json.branch;
-    } catch {
-      const next = localCreateBranch(this.cache, branch, this.cache.currentUser);
+    } catch (err) {
+      if (!this.isNetworkError(err)) throw err;
+      const next = localCreateBranch(
+        this.cache,
+        branch,
+        this.cache.currentUser,
+      );
       this.cache = next;
       this.mirror();
       return next.branches[next.branches.length - 1];
     }
   }
 
-  public async updateBranch(branchId: string, changes: Partial<Branch>): Promise<Branch | undefined> {
+  public async updateBranch(
+    branchId: string,
+    changes: Partial<Branch>,
+  ): Promise<Branch | undefined> {
     try {
-      const json = await this.api<{ branch?: Branch }>(`/api/branches/${branchId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ changes }),
-      });
+      const json = await this.api<{ branch?: Branch }>(
+        `/api/branches/${branchId}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify(changes),
+        },
+      );
       await this.refresh();
       return json.branch ?? this.cache.branches.find((b) => b.id === branchId);
-    } catch {
-      this.cache = localUpdateBranch(this.cache, branchId, changes, this.cache.currentUser);
+    } catch (err) {
+      if (!this.isNetworkError(err)) throw err;
+      this.cache = localUpdateBranch(
+        this.cache,
+        branchId,
+        changes,
+        this.cache.currentUser,
+      );
       this.mirror();
       return this.cache.branches.find((b) => b.id === branchId);
     }
@@ -487,12 +634,17 @@ class StorageService {
 
   public async deleteBranch(branchId: string): Promise<boolean> {
     try {
-      await this.api(`/api/branches/${branchId}`, { method: 'DELETE' });
+      await this.api(`/api/branches/${branchId}`, { method: "DELETE" });
       await this.refresh();
       return true;
-    } catch {
+    } catch (err) {
+      if (!this.isNetworkError(err)) throw err;
       const before = this.cache;
-      this.cache = localDeleteBranch(this.cache, branchId, this.cache.currentUser);
+      this.cache = localDeleteBranch(
+        this.cache,
+        branchId,
+        this.cache.currentUser,
+      );
       this.mirror();
       return this.cache !== before;
     }
@@ -500,9 +652,10 @@ class StorageService {
 
   public async resetToDefaults(): Promise<void> {
     try {
-      await this.api('/api/reset', { method: 'POST' });
+      await this.api("/api/reset", { method: "POST" });
       await this.refresh();
-    } catch {
+    } catch (err) {
+      if (!this.isNetworkError(err)) throw err;
       this.cache = createState();
       this.mirror();
     }

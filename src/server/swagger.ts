@@ -1,184 +1,215 @@
-import swaggerJSDoc from 'swagger-jsdoc';
-import swaggerUi from 'swagger-ui-express';
-import { Application } from 'express';
+import swaggerJSDoc from "swagger-jsdoc";
+import swaggerUi from "swagger-ui-express";
+import { Application } from "express";
 
 const options: swaggerJSDoc.Options = {
   definition: {
-    openapi: '3.0.0',
+    openapi: "3.0.0",
     info: {
-      title: 'Bayanihan Bank IT Service Desk API',
-      version: '1.0.0',
-      description: 'API documentation for the Bayanihan Bank IT Service Desk ticketing system',
+      title: "Bayanihan Bank IT Service Desk API",
+      version: "1.0.0",
+      description:
+        "API documentation for the Bayanihan Bank IT Service Desk ticketing system",
       contact: {
-        name: 'Bayanihan Bank IT Team',
-        email: 'it-support@bayanihanbank.com',
+        name: "Bayanihan Bank IT Team",
+        email: "it-support@bayanihanbank.com",
       },
     },
     servers: [
       {
-        url: 'http://localhost:3001/api',
-        description: 'Development server',
+        url: "http://localhost:3001/api",
+        description: "Development server",
       },
     ],
     components: {
       securitySchemes: {
         bearerAuth: {
-          type: 'http',
-          scheme: 'bearer',
-          bearerFormat: 'JWT',
+          type: "http",
+          scheme: "bearer",
+          bearerFormat: "JWT",
         },
       },
       schemas: {
         User: {
-          type: 'object',
+          type: "object",
           properties: {
-            id: { type: 'string' },
-            username: { type: 'string' },
-            name: { type: 'string' },
-            role: { type: 'string', enum: ['BRANCH_USER', 'IT_STAFF', 'ADMINISTRATOR', 'AUDITOR'] },
-            email: { type: 'string' },
-            branchId: { type: 'string', nullable: true },
-            isActive: { type: 'boolean' },
-            mustChangePassword: { type: 'boolean' },
-            passwordResetRequested: { type: 'boolean' },
-            createdAt: { type: 'string', format: 'date-time' },
-            updatedAt: { type: 'string', format: 'date-time' },
+            id: { type: "string" },
+            username: { type: "string" },
+            name: { type: "string" },
+            role: {
+              type: "string",
+              enum: ["BRANCH_USER", "IT_STAFF", "ADMINISTRATOR", "AUDITOR"],
+            },
+            email: { type: "string" },
+            branchId: { type: "string", nullable: true },
+            isActive: { type: "boolean" },
+            mustChangePassword: { type: "boolean" },
+            passwordResetRequested: { type: "boolean" },
+            createdAt: { type: "string", format: "date-time" },
+            updatedAt: { type: "string", format: "date-time" },
           },
         },
         Ticket: {
-          type: 'object',
+          type: "object",
           properties: {
-            id: { type: 'string' },
-            subject: { type: 'string' },
-            description: { type: 'string' },
-            category: { type: 'string' },
-            status: { type: 'string', enum: ['Pending', 'Assigned', 'In Progress', 'Resolved', 'Closed'] },
-            priority: { type: 'string', enum: ['Low', 'Medium', 'High', 'Critical'] },
-            branchId: { type: 'string' },
-            requesterId: { type: 'string' },
-            assignedToId: { type: 'string', nullable: true },
-            attachmentName: { type: 'string', nullable: true },
-            createdAt: { type: 'string', format: 'date-time' },
-            updatedAt: { type: 'string', format: 'date-time' },
-            resolvedAt: { type: 'string', format: 'date-time', nullable: true },
-            closedAt: { type: 'string', format: 'date-time', nullable: true },
+            id: { type: "string" },
+            subject: { type: "string" },
+            description: { type: "string" },
+            category: { type: "string" },
+            status: {
+              type: "string",
+              enum: [
+                "Pending",
+                "Assigned",
+                "In Progress",
+                "Resolved",
+                "Closed",
+              ],
+            },
+            priority: {
+              type: "string",
+              enum: ["Low", "Medium", "High", "Critical"],
+            },
+            branchId: { type: "string" },
+            requesterId: { type: "string" },
+            assignedToId: { type: "string", nullable: true },
+            attachmentName: { type: "string", nullable: true },
+            createdAt: { type: "string", format: "date-time" },
+            updatedAt: { type: "string", format: "date-time" },
+            resolvedAt: { type: "string", format: "date-time", nullable: true },
+            closedAt: { type: "string", format: "date-time", nullable: true },
           },
         },
         Branch: {
-          type: 'object',
+          type: "object",
           properties: {
-            id: { type: 'string' },
-            name: { type: 'string' },
-            location: { type: 'string' },
-            code: { type: 'string', nullable: true },
-            status: { type: 'string', enum: ['Active', 'Inactive'] },
-            userCount: { type: 'number' },
+            id: { type: "string" },
+            name: { type: "string" },
+            location: { type: "string" },
+            code: { type: "string", nullable: true },
+            status: { type: "string", enum: ["Active", "Inactive"] },
+            userCount: { type: "number" },
           },
         },
         Comment: {
-          type: 'object',
+          type: "object",
           properties: {
-            id: { type: 'string' },
-            ticketId: { type: 'string' },
-            authorId: { type: 'string' },
-            content: { type: 'string' },
-            isInternal: { type: 'boolean' },
-            createdAt: { type: 'string', format: 'date-time' },
+            id: { type: "string" },
+            ticketId: { type: "string" },
+            authorId: { type: "string" },
+            content: { type: "string" },
+            isInternal: { type: "boolean" },
+            createdAt: { type: "string", format: "date-time" },
           },
         },
         Error: {
-          type: 'object',
+          type: "object",
           properties: {
-            error: { type: 'string' },
+            error: { type: "string" },
           },
         },
         AuthResponse: {
-          type: 'object',
+          type: "object",
           properties: {
-            token: { type: 'string' },
-            user: { $ref: '#/components/schemas/User' },
+            token: { type: "string" },
+            user: { $ref: "#/components/schemas/User" },
           },
         },
         StateResponse: {
-          type: 'object',
+          type: "object",
           properties: {
-            users: { type: 'array', items: { $ref: '#/components/schemas/User' } },
-            tickets: { type: 'array', items: { $ref: '#/components/schemas/Ticket' } },
-            branches: { type: 'array', items: { $ref: '#/components/schemas/Branch' } },
-            categories: { type: 'array', items: { type: 'object' } },
-            comments: { type: 'array', items: { $ref: '#/components/schemas/Comment' } },
-            notifications: { type: 'array', items: { type: 'object' } },
-            timeline: { type: 'array', items: { type: 'object' } },
-            auditLogs: { type: 'array', items: { type: 'object' } },
-            currentUser: { $ref: '#/components/schemas/User' },
+            users: {
+              type: "array",
+              items: { $ref: "#/components/schemas/User" },
+            },
+            tickets: {
+              type: "array",
+              items: { $ref: "#/components/schemas/Ticket" },
+            },
+            branches: {
+              type: "array",
+              items: { $ref: "#/components/schemas/Branch" },
+            },
+            categories: { type: "array", items: { type: "object" } },
+            comments: {
+              type: "array",
+              items: { $ref: "#/components/schemas/Comment" },
+            },
+            notifications: { type: "array", items: { type: "object" } },
+            timeline: { type: "array", items: { type: "object" } },
+            auditLogs: { type: "array", items: { type: "object" } },
+            currentUser: { $ref: "#/components/schemas/User" },
           },
         },
       },
     },
     security: [{ bearerAuth: [] }],
     paths: {
-      '/auth/login': {
+      "/auth/login": {
         post: {
-          summary: 'User login',
-          tags: ['Authentication'],
+          summary: "User login",
+          tags: ["Authentication"],
           security: [],
           requestBody: {
             required: true,
             content: {
-              'application/json': {
+              "application/json": {
                 schema: {
-                  type: 'object',
-                  required: ['username', 'password'],
+                  type: "object",
+                  required: ["username", "password"],
                   properties: {
-                    username: { type: 'string' },
-                    password: { type: 'string' },
+                    username: { type: "string" },
+                    password: { type: "string" },
                   },
                 },
               },
             },
           },
           responses: {
-            '200': {
-              description: 'Login successful',
+            "200": {
+              description: "Login successful",
               content: {
-                'application/json': {
-                  schema: { $ref: '#/components/schemas/AuthResponse' },
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/AuthResponse" },
                 },
               },
             },
-            '401': {
-              description: 'Invalid credentials',
+            "401": {
+              description: "Invalid credentials",
               content: {
-                'application/json': {
-                  schema: { $ref: '#/components/schemas/Error' },
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
                 },
               },
             },
-            '429': {
-              description: 'Too many login attempts',
+            "429": {
+              description: "Too many login attempts",
               content: {
-                'application/json': {
-                  schema: { $ref: '#/components/schemas/Error' },
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
                 },
               },
             },
           },
         },
       },
-      '/auth/demo-accounts': {
+      "/auth/demo-accounts": {
         get: {
-          summary: 'Get demo accounts (development only)',
-          tags: ['Authentication'],
+          summary: "Get demo accounts (development only)",
+          tags: ["Authentication"],
           security: [],
           responses: {
-            '200': {
-              description: 'List of demo accounts',
+            "200": {
+              description: "List of demo accounts",
               content: {
-                'application/json': {
+                "application/json": {
                   schema: {
-                    type: 'object',
+                    type: "object",
                     properties: {
-                      users: { type: 'array', items: { $ref: '#/components/schemas/User' } },
+                      users: {
+                        type: "array",
+                        items: { $ref: "#/components/schemas/User" },
+                      },
                     },
                   },
                 },
@@ -187,157 +218,157 @@ const options: swaggerJSDoc.Options = {
           },
         },
       },
-      '/auth/reset-request': {
+      "/auth/reset-request": {
         post: {
-          summary: 'Request password reset',
-          tags: ['Authentication'],
+          summary: "Request password reset",
+          tags: ["Authentication"],
           security: [],
           requestBody: {
             required: true,
             content: {
-              'application/json': {
+              "application/json": {
                 schema: {
-                  type: 'object',
-                  required: ['username'],
+                  type: "object",
+                  required: ["username"],
                   properties: {
-                    username: { type: 'string' },
+                    username: { type: "string" },
                   },
                 },
               },
             },
           },
           responses: {
-            '200': {
-              description: 'Reset request submitted or requires recovery key',
+            "200": {
+              description: "Reset request submitted or requires recovery key",
               content: {
-                'application/json': {
+                "application/json": {
                   schema: {
-                    type: 'object',
+                    type: "object",
                     properties: {
-                      ok: { type: 'boolean' },
-                      requiresRecoveryKey: { type: 'boolean' },
-                      message: { type: 'string' },
+                      ok: { type: "boolean" },
+                      requiresRecoveryKey: { type: "boolean" },
+                      message: { type: "string" },
                     },
                   },
                 },
               },
             },
-            '404': {
-              description: 'Account not found',
+            "404": {
+              description: "Account not found",
               content: {
-                'application/json': {
-                  schema: { $ref: '#/components/schemas/Error' },
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
                 },
               },
             },
           },
         },
       },
-      '/auth/admin-recovery': {
+      "/auth/admin-recovery": {
         post: {
-          summary: 'Admin recovery with recovery key',
-          tags: ['Authentication'],
+          summary: "Admin recovery with recovery key",
+          tags: ["Authentication"],
           security: [],
           requestBody: {
             required: true,
             content: {
-              'application/json': {
+              "application/json": {
                 schema: {
-                  type: 'object',
-                  required: ['username', 'key'],
+                  type: "object",
+                  required: ["username", "key"],
                   properties: {
-                    username: { type: 'string' },
-                    key: { type: 'string' },
+                    username: { type: "string" },
+                    key: { type: "string" },
                   },
                 },
               },
             },
           },
           responses: {
-            '200': {
-              description: 'Admin password reset with one-time password',
+            "200": {
+              description: "Admin password reset with one-time password",
               content: {
-                'application/json': {
+                "application/json": {
                   schema: {
-                    type: 'object',
+                    type: "object",
                     properties: {
-                      ok: { type: 'boolean' },
-                      oneTimePassword: { type: 'string' },
-                      message: { type: 'string' },
+                      ok: { type: "boolean" },
+                      oneTimePassword: { type: "string" },
+                      message: { type: "string" },
                     },
                   },
                 },
               },
             },
-            '403': {
-              description: 'Invalid recovery key or credentials',
+            "403": {
+              description: "Invalid recovery key or credentials",
               content: {
-                'application/json': {
-                  schema: { $ref: '#/components/schemas/Error' },
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
                 },
               },
             },
           },
         },
       },
-      '/auth/password': {
+      "/auth/password": {
         patch: {
-          summary: 'Change password',
-          tags: ['Authentication'],
+          summary: "Change password",
+          tags: ["Authentication"],
           requestBody: {
             required: true,
             content: {
-              'application/json': {
+              "application/json": {
                 schema: {
-                  type: 'object',
-                  required: ['currentPassword', 'newPassword'],
+                  type: "object",
+                  required: ["currentPassword", "newPassword"],
                   properties: {
-                    currentPassword: { type: 'string' },
-                    newPassword: { type: 'string', minLength: 6 },
+                    currentPassword: { type: "string" },
+                    newPassword: { type: "string", minLength: 6 },
                   },
                 },
               },
             },
           },
           responses: {
-            '200': {
-              description: 'Password changed successfully',
+            "200": {
+              description: "Password changed successfully",
               content: {
-                'application/json': {
+                "application/json": {
                   schema: {
-                    type: 'object',
+                    type: "object",
                     properties: {
-                      ok: { type: 'boolean' },
-                      user: { $ref: '#/components/schemas/User' },
+                      ok: { type: "boolean" },
+                      user: { $ref: "#/components/schemas/User" },
                     },
                   },
                 },
               },
             },
-            '400': {
-              description: 'Invalid current password or new password too short',
+            "400": {
+              description: "Invalid current password or new password too short",
               content: {
-                'application/json': {
-                  schema: { $ref: '#/components/schemas/Error' },
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
                 },
               },
             },
           },
         },
       },
-      '/auth/me': {
+      "/auth/me": {
         get: {
-          summary: 'Get current user info',
-          tags: ['Authentication'],
+          summary: "Get current user info",
+          tags: ["Authentication"],
           responses: {
-            '200': {
-              description: 'Current user',
+            "200": {
+              description: "Current user",
               content: {
-                'application/json': {
+                "application/json": {
                   schema: {
-                    type: 'object',
+                    type: "object",
                     properties: {
-                      user: { $ref: '#/components/schemas/User' },
+                      user: { $ref: "#/components/schemas/User" },
                     },
                   },
                 },
@@ -346,42 +377,45 @@ const options: swaggerJSDoc.Options = {
           },
         },
       },
-      '/state': {
+      "/state": {
         get: {
-          summary: 'Get full application state (role-filtered)',
-          tags: ['State'],
+          summary: "Get full application state (role-filtered)",
+          tags: ["State"],
           responses: {
-            '200': {
-              description: 'Application state',
+            "200": {
+              description: "Application state",
               content: {
-                'application/json': {
-                  schema: { $ref: '#/components/schemas/StateResponse' },
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/StateResponse" },
                 },
               },
             },
           },
         },
       },
-      '/tickets': {
+      "/tickets": {
         get: {
-          summary: 'List tickets with optional filters',
-          tags: ['Tickets'],
+          summary: "List tickets with optional filters",
+          tags: ["Tickets"],
           parameters: [
-            { name: 'status', in: 'query', schema: { type: 'string' } },
-            { name: 'branchId', in: 'query', schema: { type: 'string' } },
-            { name: 'assignedToId', in: 'query', schema: { type: 'string' } },
-            { name: 'requesterId', in: 'query', schema: { type: 'string' } },
-            { name: 'category', in: 'query', schema: { type: 'string' } },
+            { name: "status", in: "query", schema: { type: "string" } },
+            { name: "branchId", in: "query", schema: { type: "string" } },
+            { name: "assignedToId", in: "query", schema: { type: "string" } },
+            { name: "requesterId", in: "query", schema: { type: "string" } },
+            { name: "category", in: "query", schema: { type: "string" } },
           ],
           responses: {
-            '200': {
-              description: 'List of tickets',
+            "200": {
+              description: "List of tickets",
               content: {
-                'application/json': {
+                "application/json": {
                   schema: {
-                    type: 'object',
+                    type: "object",
                     properties: {
-                      tickets: { type: 'array', items: { $ref: '#/components/schemas/Ticket' } },
+                      tickets: {
+                        type: "array",
+                        items: { $ref: "#/components/schemas/Ticket" },
+                      },
                     },
                   },
                 },
@@ -390,348 +424,324 @@ const options: swaggerJSDoc.Options = {
           },
         },
         post: {
-          summary: 'Create a new ticket',
-          tags: ['Tickets'],
+          summary: "Create a new ticket",
+          tags: ["Tickets"],
           requestBody: {
             required: true,
             content: {
-              'application/json': {
+              "application/json": {
                 schema: {
-                  type: 'object',
-                  required: ['subject', 'description', 'category'],
+                  type: "object",
+                  required: ["subject", "description", "category"],
                   properties: {
-                    subject: { type: 'string', maxLength: 200 },
-                    description: { type: 'string', maxLength: 10000 },
-                    category: { type: 'string', enum: ['Hardware', 'Software', 'Network', 'Access', 'Email', 'Security', 'Other'] },
-                    attachmentName: { type: 'string' },
+                    subject: { type: "string", maxLength: 200 },
+                    description: { type: "string", maxLength: 10000 },
+                    category: {
+                      type: "string",
+                      enum: [
+                        "Hardware",
+                        "Software",
+                        "Network",
+                        "Access",
+                        "Email",
+                        "Security",
+                        "Other",
+                      ],
+                    },
+                    attachmentName: { type: "string" },
                   },
                 },
               },
             },
           },
           responses: {
-            '200': {
-              description: 'Created ticket',
+            "200": {
+              description: "Created ticket",
               content: {
-                'application/json': {
+                "application/json": {
                   schema: {
-                    type: 'object',
+                    type: "object",
                     properties: {
-                      ticket: { $ref: '#/components/schemas/Ticket' },
+                      ticket: { $ref: "#/components/schemas/Ticket" },
                     },
                   },
                 },
               },
             },
-            '400': {
-              description: 'Validation error',
+            "400": {
+              description: "Validation error",
               content: {
-                'application/json': {
-                  schema: { $ref: '#/components/schemas/Error' },
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
                 },
               },
             },
           },
         },
       },
-      '/tickets/{id}': {
+      "/tickets/{id}": {
         get: {
-          summary: 'Get ticket by ID',
-          tags: ['Tickets'],
+          summary: "Get ticket by ID",
+          tags: ["Tickets"],
           parameters: [
-            { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+            {
+              name: "id",
+              in: "path",
+              required: true,
+              schema: { type: "string" },
+            },
           ],
           responses: {
-            '200': {
-              description: 'Ticket details',
+            "200": {
+              description: "Ticket details",
               content: {
-                'application/json': {
+                "application/json": {
                   schema: {
-                    type: 'object',
+                    type: "object",
                     properties: {
-                      ticket: { $ref: '#/components/schemas/Ticket' },
+                      ticket: { $ref: "#/components/schemas/Ticket" },
                     },
                   },
                 },
               },
             },
-            '404': {
-              description: 'Ticket not found',
+            "404": {
+              description: "Ticket not found",
               content: {
-                'application/json': {
-                  schema: { $ref: '#/components/schemas/Error' },
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
                 },
               },
             },
           },
         },
       },
-      '/tickets/{id}/status': {
+      "/tickets/{id}/status": {
         patch: {
-          summary: 'Update ticket status',
-          tags: ['Tickets'],
+          summary: "Update ticket status",
+          tags: ["Tickets"],
           parameters: [
-            { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+            {
+              name: "id",
+              in: "path",
+              required: true,
+              schema: { type: "string" },
+            },
           ],
           requestBody: {
             required: true,
             content: {
-              'application/json': {
+              "application/json": {
                 schema: {
-                  type: 'object',
-                  required: ['newStatus'],
+                  type: "object",
+                  required: ["newStatus"],
                   properties: {
-                    newStatus: { type: 'string', enum: ['Pending', 'Assigned', 'In Progress', 'Resolved', 'Closed'] },
-                    notes: { type: 'string' },
+                    newStatus: {
+                      type: "string",
+                      enum: [
+                        "Pending",
+                        "Assigned",
+                        "In Progress",
+                        "Resolved",
+                        "Closed",
+                      ],
+                    },
+                    notes: { type: "string" },
                   },
                 },
               },
             },
           },
           responses: {
-            '200': {
-              description: 'Updated ticket',
+            "200": {
+              description: "Updated ticket",
               content: {
-                'application/json': {
+                "application/json": {
                   schema: {
-                    type: 'object',
+                    type: "object",
                     properties: {
-                      ticket: { $ref: '#/components/schemas/Ticket' },
+                      ticket: { $ref: "#/components/schemas/Ticket" },
                     },
                   },
                 },
               },
             },
-            '404': {
-              description: 'Ticket not found',
+            "404": {
+              description: "Ticket not found",
               content: {
-                'application/json': {
-                  schema: { $ref: '#/components/schemas/Error' },
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
                 },
               },
             },
           },
         },
       },
-      '/tickets/{id}/assign': {
+      "/tickets/{id}/assign": {
         patch: {
-          summary: 'Assign ticket to IT staff',
-          tags: ['Tickets'],
+          summary: "Assign ticket to IT staff",
+          tags: ["Tickets"],
           parameters: [
-            { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+            {
+              name: "id",
+              in: "path",
+              required: true,
+              schema: { type: "string" },
+            },
           ],
           requestBody: {
             required: true,
             content: {
-              'application/json': {
+              "application/json": {
                 schema: {
-                  type: 'object',
-                  required: ['staffUserId'],
+                  type: "object",
+                  required: ["staffUserId"],
                   properties: {
-                    staffUserId: { type: 'string' },
+                    staffUserId: { type: "string" },
                   },
                 },
               },
             },
           },
           responses: {
-            '200': {
-              description: 'Assigned ticket',
+            "200": {
+              description: "Assigned ticket",
               content: {
-                'application/json': {
+                "application/json": {
                   schema: {
-                    type: 'object',
+                    type: "object",
                     properties: {
-                      ticket: { $ref: '#/components/schemas/Ticket' },
+                      ticket: { $ref: "#/components/schemas/Ticket" },
                     },
                   },
                 },
               },
             },
-            '400': {
-              description: 'Invalid staff user',
+            "400": {
+              description: "Invalid staff user",
               content: {
-                'application/json': {
-                  schema: { $ref: '#/components/schemas/Error' },
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
                 },
               },
             },
-            '404': {
-              description: 'Ticket not found',
+            "404": {
+              description: "Ticket not found",
               content: {
-                'application/json': {
-                  schema: { $ref: '#/components/schemas/Error' },
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
                 },
               },
             },
           },
         },
       },
-      '/tickets/{id}/comments': {
+      "/tickets/{id}/comments": {
         get: {
-          summary: 'Get ticket comments',
-          tags: ['Tickets'],
+          summary: "Get ticket comments",
+          tags: ["Tickets"],
           parameters: [
-            { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+            {
+              name: "id",
+              in: "path",
+              required: true,
+              schema: { type: "string" },
+            },
           ],
           responses: {
-            '200': {
-              description: 'List of comments',
+            "200": {
+              description: "List of comments",
               content: {
-                'application/json': {
+                "application/json": {
                   schema: {
-                    type: 'object',
+                    type: "object",
                     properties: {
-                      comments: { type: 'array', items: { $ref: '#/components/schemas/Comment' } },
+                      comments: {
+                        type: "array",
+                        items: { $ref: "#/components/schemas/Comment" },
+                      },
                     },
                   },
                 },
               },
             },
-            '404': {
-              description: 'Ticket not found',
+            "404": {
+              description: "Ticket not found",
               content: {
-                'application/json': {
-                  schema: { $ref: '#/components/schemas/Error' },
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
                 },
               },
             },
           },
         },
         post: {
-          summary: 'Add comment to ticket',
-          tags: ['Tickets'],
+          summary: "Add comment to ticket",
+          tags: ["Tickets"],
           parameters: [
-            { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+            {
+              name: "id",
+              in: "path",
+              required: true,
+              schema: { type: "string" },
+            },
           ],
           requestBody: {
             required: true,
             content: {
-              'application/json': {
+              "application/json": {
                 schema: {
-                  type: 'object',
-                  required: ['content'],
+                  type: "object",
+                  required: ["content"],
                   properties: {
-                    content: { type: 'string', maxLength: 10000 },
-                    isInternal: { type: 'boolean' },
+                    content: { type: "string", maxLength: 10000 },
+                    isInternal: { type: "boolean" },
                   },
                 },
               },
             },
           },
           responses: {
-            '200': {
-              description: 'Created comment',
+            "200": {
+              description: "Created comment",
               content: {
-                'application/json': {
+                "application/json": {
                   schema: {
-                    type: 'object',
+                    type: "object",
                     properties: {
-                      comment: { $ref: '#/components/schemas/Comment' },
+                      comment: { $ref: "#/components/schemas/Comment" },
                     },
                   },
                 },
               },
             },
-            '400': {
-              description: 'Content is required',
+            "400": {
+              description: "Content is required",
               content: {
-                'application/json': {
-                  schema: { $ref: '#/components/schemas/Error' },
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
                 },
               },
             },
           },
         },
       },
-      '/users': {
+      "/users": {
         get: {
-          summary: 'List users (role-filtered)',
-          tags: ['Users'],
+          summary: "List users (role-filtered)",
+          tags: ["Users"],
           responses: {
-            '200': {
-              description: 'List of users',
+            "200": {
+              description: "List of users",
               content: {
-                'application/json': {
+                "application/json": {
                   schema: {
-                    type: 'object',
+                    type: "object",
                     properties: {
-                      users: { type: 'array', items: { $ref: '#/components/schemas/User' } },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-        post: {
-          summary: 'Create new user (admin only)',
-          tags: ['Users'],
-          requestBody: {
-            required: true,
-            content: {
-              'application/json': {
-                schema: {
-                  type: 'object',
-                  required: ['username', 'name', 'role', 'email'],
-                  properties: {
-                    username: { type: 'string', minLength: 3, maxLength: 50 },
-                    name: { type: 'string', minLength: 1, maxLength: 100 },
-                    role: { type: 'string', enum: ['BRANCH_USER', 'IT_STAFF', 'ADMINISTRATOR', 'AUDITOR'] },
-                    email: { type: 'string', format: 'email' },
-                    branchId: { type: 'string' },
-                    password: { type: 'string', minLength: 6 },
-                  },
-                },
-              },
-            },
-          },
-          responses: {
-            '200': {
-              description: 'Created user',
-              content: {
-                'application/json': {
-                  schema: {
-                    type: 'object',
-                    properties: {
-                      user: { $ref: '#/components/schemas/User' },
-                    },
-                  },
-                },
-              },
-            },
-            '400': {
-              description: 'Validation error',
-              content: {
-                'application/json': {
-                  schema: { $ref: '#/components/schemas/Error' },
-                },
-              },
-            },
-            '403': {
-              description: 'Admin access required',
-              content: {
-                'application/json': {
-                  schema: { $ref: '#/components/schemas/Error' },
-                },
-              },
-            },
-          },
-        },
-      },
-      '/branches': {
-        get: {
-          summary: 'List all branches',
-          tags: ['Branches'],
-          responses: {
-            '200': {
-              description: 'List of branches',
-              content: {
-                'application/json': {
-                  schema: {
-                    type: 'object',
-                    properties: {
-                      branches: { type: 'array', items: { $ref: '#/components/schemas/Branch' } },
+                      users: {
+                        type: "array",
+                        items: { $ref: "#/components/schemas/User" },
+                      },
                     },
                   },
                 },
@@ -740,91 +750,84 @@ const options: swaggerJSDoc.Options = {
           },
         },
         post: {
-          summary: 'Create new branch (admin only)',
-          tags: ['Branches'],
+          summary: "Create new user (admin only)",
+          tags: ["Users"],
           requestBody: {
             required: true,
             content: {
-              'application/json': {
+              "application/json": {
                 schema: {
-                  type: 'object',
-                  required: ['name', 'location'],
+                  type: "object",
+                  required: ["username", "name", "role", "email"],
                   properties: {
-                    name: { type: 'string', minLength: 1, maxLength: 100 },
-                    location: { type: 'string', minLength: 1, maxLength: 200 },
-                    code: { type: 'string', maxLength: 20 },
+                    username: { type: "string", minLength: 3, maxLength: 50 },
+                    name: { type: "string", minLength: 1, maxLength: 100 },
+                    role: {
+                      type: "string",
+                      enum: [
+                        "BRANCH_USER",
+                        "IT_STAFF",
+                        "ADMINISTRATOR",
+                        "AUDITOR",
+                      ],
+                    },
+                    email: { type: "string", format: "email" },
+                    branchId: { type: "string" },
+                    password: { type: "string", minLength: 6 },
                   },
                 },
               },
             },
           },
           responses: {
-            '200': {
-              description: 'Created branch',
+            "200": {
+              description: "Created user",
               content: {
-                'application/json': {
+                "application/json": {
                   schema: {
-                    type: 'object',
+                    type: "object",
                     properties: {
-                      branch: { $ref: '#/components/schemas/Branch' },
+                      user: { $ref: "#/components/schemas/User" },
                     },
                   },
                 },
               },
             },
-            '400': {
-              description: 'Validation error',
+            "400": {
+              description: "Validation error",
               content: {
-                'application/json': {
-                  schema: { $ref: '#/components/schemas/Error' },
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
                 },
               },
             },
-            '403': {
-              description: 'Admin access required',
+            "403": {
+              description: "Admin access required",
               content: {
-                'application/json': {
-                  schema: { $ref: '#/components/schemas/Error' },
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
                 },
               },
             },
           },
         },
       },
-      '/categories': {
+      "/branches": {
         get: {
-          summary: 'List all categories',
-          tags: ['Categories'],
+          summary: "List all branches",
+          tags: ["Branches"],
           responses: {
-            '200': {
-              description: 'List of categories',
+            "200": {
+              description: "List of branches",
               content: {
-                'application/json': {
+                "application/json": {
                   schema: {
-                    type: 'object',
+                    type: "object",
                     properties: {
-                      categories: { type: 'array', items: { type: 'object' } },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      '/notifications': {
-        get: {
-          summary: 'Get user notifications',
-          tags: ['Notifications'],
-          responses: {
-            '200': {
-              description: 'List of notifications',
-              content: {
-                'application/json': {
-                  schema: {
-                    type: 'object',
-                    properties: {
-                      notifications: { type: 'array', items: { type: 'object' } },
+                      branches: {
+                        type: "array",
+                        items: { $ref: "#/components/schemas/Branch" },
+                      },
                     },
                   },
                 },
@@ -832,20 +835,77 @@ const options: swaggerJSDoc.Options = {
             },
           },
         },
-      },
-      '/audit-logs': {
-        get: {
-          summary: 'Get audit logs (admin/IT/auditor only)',
-          tags: ['Audit'],
+        post: {
+          summary: "Create new branch (admin only)",
+          tags: ["Branches"],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["name", "location"],
+                  properties: {
+                    name: { type: "string", minLength: 1, maxLength: 100 },
+                    location: { type: "string", minLength: 1, maxLength: 200 },
+                    code: { type: "string", maxLength: 20 },
+                    status: {
+                      type: "string",
+                      enum: ["Active", "Inactive"],
+                      default: "Active",
+                    },
+                    userCount: { type: "number", minimum: 0 },
+                  },
+                },
+              },
+            },
+          },
           responses: {
-            '200': {
-              description: 'List of audit logs',
+            "200": {
+              description: "Created branch",
               content: {
-                'application/json': {
+                "application/json": {
                   schema: {
-                    type: 'object',
+                    type: "object",
                     properties: {
-                      auditLogs: { type: 'array', items: { type: 'object' } },
+                      branch: { $ref: "#/components/schemas/Branch" },
+                    },
+                  },
+                },
+              },
+            },
+            "400": {
+              description: "Validation error",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+            "403": {
+              description: "Admin access required",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/categories": {
+        get: {
+          summary: "List all categories",
+          tags: ["Categories"],
+          responses: {
+            "200": {
+              description: "List of categories",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      categories: { type: "array", items: { type: "object" } },
                     },
                   },
                 },
@@ -854,20 +914,65 @@ const options: swaggerJSDoc.Options = {
           },
         },
       },
-      '/health': {
+      "/notifications": {
         get: {
-          summary: 'Health check',
-          tags: ['System'],
+          summary: "Get user notifications",
+          tags: ["Notifications"],
+          responses: {
+            "200": {
+              description: "List of notifications",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      notifications: {
+                        type: "array",
+                        items: { type: "object" },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/audit-logs": {
+        get: {
+          summary: "Get audit logs (admin/IT/auditor only)",
+          tags: ["Audit"],
+          responses: {
+            "200": {
+              description: "List of audit logs",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      auditLogs: { type: "array", items: { type: "object" } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/health": {
+        get: {
+          summary: "Health check",
+          tags: ["System"],
           security: [],
           responses: {
-            '200': {
-              description: 'Service is healthy',
+            "200": {
+              description: "Service is healthy",
               content: {
-                'application/json': {
+                "application/json": {
                   schema: {
-                    type: 'object',
+                    type: "object",
                     properties: {
-                      ok: { type: 'boolean' },
+                      ok: { type: "boolean" },
                     },
                   },
                 },
@@ -876,28 +981,33 @@ const options: swaggerJSDoc.Options = {
           },
         },
       },
-      '/events': {
+      "/events": {
         get: {
-          summary: 'Server-Sent Events stream for real-time updates',
-          tags: ['System'],
+          summary: "Server-Sent Events stream for real-time updates",
+          tags: ["System"],
           security: [],
           parameters: [
-            { name: 'token', in: 'query', required: true, schema: { type: 'string' } },
+            {
+              name: "token",
+              in: "query",
+              required: true,
+              schema: { type: "string" },
+            },
           ],
           responses: {
-            '200': {
-              description: 'SSE stream',
+            "200": {
+              description: "SSE stream",
               content: {
-                'text/event-stream': {
-                  schema: { type: 'string' },
+                "text/event-stream": {
+                  schema: { type: "string" },
                 },
               },
             },
-            '401': {
-              description: 'Invalid or expired token',
+            "401": {
+              description: "Invalid or expired token",
               content: {
-                'application/json': {
-                  schema: { $ref: '#/components/schemas/Error' },
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/Error" },
                 },
               },
             },
@@ -912,14 +1022,18 @@ const options: swaggerJSDoc.Options = {
 const swaggerSpec = swaggerJSDoc(options);
 
 export function setupSwagger(app: Application): void {
-  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
-    customCss: '.swagger-ui .topbar { display: none }',
-    customSiteTitle: 'Bayanihan Bank IT Service Desk API',
-  }));
+  app.use(
+    "/api-docs",
+    swaggerUi.serve,
+    swaggerUi.setup(swaggerSpec, {
+      customCss: ".swagger-ui .topbar { display: none }",
+      customSiteTitle: "Bayanihan Bank IT Service Desk API",
+    }),
+  );
 
   // JSON endpoint
-  app.get('/api-docs.json', (_req, res) => {
-    res.setHeader('Content-Type', 'application/json');
+  app.get("/api-docs.json", (_req, res) => {
+    res.setHeader("Content-Type", "application/json");
     res.send(swaggerSpec);
   });
 }
