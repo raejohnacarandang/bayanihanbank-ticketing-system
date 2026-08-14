@@ -251,8 +251,8 @@ export const TicketListView: React.FC<TicketListViewProps> = ({
 
       {/* Ticket Table */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          {filteredTickets.length === 0 ? (
+        {filteredTickets.length === 0 ? (
+          <div className="overflow-x-auto">
             <div className="p-12 text-center max-w-sm mx-auto space-y-3">
               <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
                 <TicketIcon className="w-6 h-6" />
@@ -269,8 +269,79 @@ export const TicketListView: React.FC<TicketListViewProps> = ({
                   Reset Filters
                 </button>
               )}
+              </div>
             </div>
           ) : (
+            <>
+              {/* Mobile card list */}
+              <div className="md:hidden divide-y divide-slate-100">
+                {pageTickets.map((ticket) => (
+                  <div
+                    key={ticket.id}
+                    onClick={() => onNavigateTicketDetail(ticket.id)}
+                    className="p-4 hover:bg-emerald-50/40 transition cursor-pointer group space-y-3"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="font-mono font-bold text-emerald-900 group-hover:underline">
+                        #{ticket.id}
+                      </span>
+                      <StatusBadge status={ticket.status} size="sm" />
+                    </div>
+                    <div className="text-sm font-semibold text-slate-900 leading-snug">
+                      {ticket.subject}
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                      <div>
+                        <span className="text-slate-400">Branch</span>
+                        <div className="font-semibold text-slate-700">
+                          {ticket.branchName}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-slate-400">Category</span>
+                        <div className="font-semibold text-slate-700">
+                          {ticket.category}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-slate-400">Assigned IT</span>
+                        <div className="font-medium text-slate-700">
+                          {ticket.assignedToName || (
+                            <span className="italic text-slate-400">
+                              Unassigned
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-slate-400">Requester</span>
+                        <div className="font-medium text-slate-700">
+                          {ticket.requesterName}
+                        </div>
+                      </div>
+                      <div className="col-span-2">
+                        <span className="text-slate-400">Submitted</span>
+                        <div className="font-medium text-slate-600">
+                          {ticket.createdAt}
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onNavigateTicketDetail(ticket.id);
+                      }}
+                      className="px-3 py-1.5 rounded bg-slate-100 hover:bg-emerald-900 hover:text-white text-slate-700 font-semibold transition inline-flex items-center gap-1.5 cursor-pointer text-xs"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Manage Ticket</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop table */}
+              <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-100/90 text-slate-700 font-bold uppercase tracking-wider border-b border-slate-200">
                 <tr>
@@ -341,8 +412,9 @@ export const TicketListView: React.FC<TicketListViewProps> = ({
                 ))}
               </tbody>
             </table>
+              </div>
+            </>
           )}
-        </div>
       </div>
 
       {/* Pagination */}

@@ -97,7 +97,7 @@ export const Header: React.FC<HeaderProps> = ({
             {isSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
 
-          <BayanihanLogo size="md" showSubtitle subtitleText="IT Service Desk" />
+          <BayanihanLogo size="md" showSubtitle subtitleText="IT Service Desk" hideTextOnMobile />
         </div>
 
         {/* Right Section: Role Quick Switcher, Notifications, User Menu */}
@@ -115,13 +115,13 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <RefreshCcw className="w-3.5 h-3.5 text-emerald-400" />
               <span className="hidden lg:inline text-slate-400">Persona:</span>
-              <span className="font-semibold text-white">{currentUser.name.split(' ')[0]}</span>
+              <span className="hidden sm:inline font-semibold text-white">{currentUser.name.split(' ')[0]}</span>
               <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
             </button>
 
             {/* Role Switcher Dropdown */}
             {showRoleSwitcher && (
-              <div className="absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-[var(--shadow-pop)] border border-slate-200 text-slate-800 z-50 p-2 overflow-hidden">
+              <div className="absolute right-0 mt-2 w-72 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-[var(--shadow-pop)] border border-slate-200 text-slate-800 z-50 p-2 overflow-hidden">
                 <div className="px-3 py-2 bg-slate-50 rounded-lg mb-2 border border-slate-100">
                   <div className="text-xs font-bold text-slate-900 uppercase tracking-wider">
                     Demo Role Switcher
@@ -193,7 +193,7 @@ export const Header: React.FC<HeaderProps> = ({
 
             {/* Notifications Menu */}
             {showNotifMenu && (
-              <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-xl shadow-[var(--shadow-pop)] border border-slate-200 text-slate-800 z-50 overflow-hidden">
+              <div className="absolute right-0 mt-2 w-80 sm:w-96 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-[var(--shadow-pop)] border border-slate-200 text-slate-800 z-50 overflow-hidden">
                 <div className="px-4 py-3 bg-emerald-950 text-white flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Bell className="w-4 h-4 text-amber-400" />

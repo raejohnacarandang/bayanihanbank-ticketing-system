@@ -158,22 +158,22 @@ export const BranchDashboardView: React.FC<BranchDashboardViewProps> = ({
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="relative">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+            <div className="relative flex-1 sm:w-64">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
               <input
                 type="text"
                 placeholder="Search ticket # or subject..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 pr-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg w-full sm:w-64 focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                className="pl-9 pr-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-emerald-600"
               />
             </div>
 
             <select
               value={selectedStatusFilter}
               onChange={(e) => setSelectedStatusFilter(e.target.value)}
-              className="px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-600 font-medium"
+              className="px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-600 font-medium w-full sm:w-auto"
             >
               <option value="ALL">All Statuses</option>
               <option value="OPEN">All Open Tickets</option>
@@ -183,26 +183,69 @@ export const BranchDashboardView: React.FC<BranchDashboardViewProps> = ({
           </div>
         </div>
 
-        {/* Table View */}
-        <div className="overflow-x-auto">
-          {filteredTickets.length === 0 ? (
-            <div className="p-12 text-center max-w-sm mx-auto space-y-3">
-              <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
-                <TicketIcon className="w-6 h-6" />
-              </div>
-              <h4 className="text-sm font-bold text-slate-800">No IT requests found</h4>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                You do not have any IT requests matching your search or filter parameters.
-              </p>
-              <button
-                onClick={onNavigateNewRequest}
-                className="px-4 py-2 bg-emerald-900 hover:bg-emerald-800 text-white font-semibold text-xs rounded-lg transition inline-flex items-center gap-1.5 cursor-pointer"
-              >
-                <PlusCircle className="w-4 h-4" />
-                <span>Create Your First Request</span>
-              </button>
+        {/* List View */}
+        {filteredTickets.length === 0 ? (
+          <div className="p-12 text-center max-w-sm mx-auto space-y-3">
+            <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
+              <TicketIcon className="w-6 h-6" />
             </div>
-          ) : (
+            <h4 className="text-sm font-bold text-slate-800">No IT requests found</h4>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              You do not have any IT requests matching your search or filter parameters.
+            </p>
+            <button
+              onClick={onNavigateNewRequest}
+              className="px-4 py-2 bg-emerald-900 hover:bg-emerald-800 text-white font-semibold text-xs rounded-lg transition inline-flex items-center gap-1.5 cursor-pointer"
+            >
+              <PlusCircle className="w-4 h-4" />
+              <span>Create Your First Request</span>
+            </button>
+          </div>
+        ) : (
+          <>
+            {/* Mobile card list */}
+            <div className="md:hidden divide-y divide-slate-100">
+              {filteredTickets.map((ticket) => (
+                <div
+                  key={ticket.id}
+                  onClick={() => onNavigateTicketDetail(ticket.id)}
+                  className="p-4 hover:bg-emerald-50/40 transition cursor-pointer group space-y-3"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="font-mono font-bold text-emerald-900 group-hover:underline">
+                      #{ticket.id}
+                    </span>
+                    <StatusBadge status={ticket.status} size="sm" />
+                  </div>
+                  <div className="text-sm font-semibold text-slate-900 leading-snug">
+                    {ticket.subject}
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                    <div>
+                      <span className="text-slate-400">Category</span>
+                      <div className="font-semibold text-slate-700">{ticket.category}</div>
+                    </div>
+                    <div>
+                      <span className="text-slate-400">Submitted</span>
+                      <div className="font-medium text-slate-600">{ticket.createdAt}</div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onNavigateTicketDetail(ticket.id);
+                    }}
+                    className="px-3 py-1.5 rounded bg-slate-100 hover:bg-emerald-600 hover:text-white text-slate-700 font-medium transition inline-flex items-center gap-1.5 cursor-pointer text-xs"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>View Ticket</span>
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop table */}
+            <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-100/80 text-slate-700 font-bold uppercase tracking-wider border-b border-slate-200">
                 <tr>
@@ -250,8 +293,9 @@ export const BranchDashboardView: React.FC<BranchDashboardViewProps> = ({
                 ))}
               </tbody>
             </table>
-          )}
-        </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

@@ -449,8 +449,8 @@ export const TicketDetailView: React.FC<TicketDetailViewProps> = ({
 
       {/* RESOLUTION RECORD MODAL FOR IT STAFF */}
       {showResolveModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs p-4 flex overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 m-auto shadow-2xl border border-slate-200 space-y-4">
             <div className="flex items-center gap-2 text-emerald-900 font-bold text-base">
               <CheckCircle2 className="w-5 h-5 text-emerald-600" />
               <span>Record IT Resolution Notes</span>

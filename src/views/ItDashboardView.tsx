@@ -177,12 +177,12 @@ export const ItDashboardView: React.FC<ItDashboardViewProps> = ({
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-slate-400" />
+          <div className="flex items-center gap-2 min-w-0">
+            <Filter className="w-4 h-4 text-slate-400 shrink-0" />
             <select
               value={branchFilter}
               onChange={(e) => setBranchFilter(e.target.value)}
-              className="px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-xl text-slate-800 font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-600"
+              className="px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-xl text-slate-800 font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-600 max-w-full"
             >
               <option value="ALL">All Branches</option>
               {branchesList.map((b) => (
@@ -194,12 +194,80 @@ export const ItDashboardView: React.FC<ItDashboardViewProps> = ({
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          {attentionTickets.length === 0 ? (
-            <div className="p-12 text-center text-slate-400 text-xs">
-              No pending IT tickets require attention at this time.
+        {attentionTickets.length === 0 ? (
+          <div className="p-12 text-center text-slate-400 text-xs">
+            No pending IT tickets require attention at this time.
+          </div>
+        ) : (
+          <>
+            {/* Mobile card list */}
+            <div className="md:hidden divide-y divide-slate-100">
+              {attentionTickets.map((ticket) => (
+                <div
+                  key={ticket.id}
+                  onClick={() => onNavigateTicketDetail(ticket.id)}
+                  className="p-4 hover:bg-emerald-50/40 transition cursor-pointer group space-y-3"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="font-mono font-bold text-emerald-900 group-hover:underline shrink-0">
+                        #{ticket.id}
+                      </span>
+                      <span className="font-bold text-slate-800 truncate">
+                        {ticket.branchName}
+                      </span>
+                    </div>
+                    <StatusBadge status={ticket.status} size="sm" />
+                  </div>
+                  <div className="text-sm font-semibold text-slate-900 leading-snug">
+                    {ticket.subject}
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                    <div>
+                      <span className="text-slate-400">Category</span>
+                      <div className="font-semibold text-slate-700">
+                        {ticket.category}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-slate-400">Assigned To</span>
+                      <div className="font-medium text-slate-700">
+                        {ticket.assignedToName || (
+                          <span className="text-amber-700 font-semibold italic">
+                            Unassigned
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-slate-400">Requester</span>
+                      <div className="font-medium text-slate-700">
+                        {ticket.requesterName}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-slate-400">Submitted</span>
+                      <div className="font-medium text-slate-600">
+                        {ticket.createdAt}
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onNavigateTicketDetail(ticket.id);
+                    }}
+                    className="px-3 py-1.5 rounded bg-emerald-900 text-white hover:bg-emerald-800 font-bold transition inline-flex items-center gap-1.5 cursor-pointer text-xs"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>Manage</span>
+                  </button>
+                </div>
+              ))}
             </div>
-          ) : (
+
+            {/* Desktop table */}
+            <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-100 text-slate-700 font-bold uppercase tracking-wider border-b border-slate-200">
                 <tr>
@@ -261,8 +329,9 @@ export const ItDashboardView: React.FC<ItDashboardViewProps> = ({
                 ))}
               </tbody>
             </table>
-          )}
-        </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

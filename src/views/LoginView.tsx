@@ -347,8 +347,8 @@ export const LoginView: React.FC<LoginViewProps> = ({
 
       {/* Forgot Password Modal */}
       {showForgotModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white text-slate-900 rounded-xl max-w-sm w-full p-6 space-y-4 shadow-2xl border border-slate-200">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs p-4 flex overflow-y-auto">
+          <div className="bg-white text-slate-900 rounded-xl max-w-sm w-full p-6 m-auto space-y-4 shadow-2xl border border-slate-200">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-emerald-900 font-bold text-base">
                 <ShieldCheck className="w-5 h-5 text-emerald-600" />

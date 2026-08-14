@@ -7,6 +7,7 @@ interface BayanihanLogoProps {
   className?: string;
   lightBackground?: boolean;
   logoUrl?: string;
+  hideTextOnMobile?: boolean;
 }
 
 export const BayanihanLogo: React.FC<BayanihanLogoProps> = ({
@@ -16,6 +17,7 @@ export const BayanihanLogo: React.FC<BayanihanLogoProps> = ({
   className = '',
   lightBackground = false,
   logoUrl = '/logo1.png',
+  hideTextOnMobile = false,
 }) => {
   const [imageFailed, setImageFailed] = useState(false);
 
@@ -89,7 +91,11 @@ export const BayanihanLogo: React.FC<BayanihanLogoProps> = ({
       </div>
 
       {/* Brand Text */}
-      <div className="flex flex-col justify-center">
+      <div
+        className={`flex flex-col justify-center ${
+          hideTextOnMobile ? 'hidden min-[440px]:flex' : ''
+        }`}
+      >
         <div className="flex items-baseline gap-1.5 leading-none">
           <span
             className={`font-black tracking-tight ${titleSizes} ${
