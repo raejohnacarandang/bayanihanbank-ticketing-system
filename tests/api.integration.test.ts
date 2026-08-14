@@ -436,7 +436,7 @@ describe("API Integration Tests", () => {
         .send({
           subject: "Comment Test",
           description: "Testing comments",
-          category: "Access",
+          category: "Account & Access",
         });
 
       const ticketId = createRes.body.ticket.id;

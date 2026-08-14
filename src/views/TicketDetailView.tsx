@@ -139,7 +139,14 @@ export const TicketDetailView: React.FC<TicketDetailViewProps> = ({
               <span className="font-mono text-xs font-bold text-emerald-300 bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800">
                 #{ticket.id}
               </span>
-              <span className="text-xs font-semibold text-slate-300">{ticket.category}</span>
+              <span className="text-xs font-semibold text-slate-300">
+                {ticket.category}
+                {ticket.subcategory && (
+                  <span className="ml-2 text-[10px] font-mono text-emerald-300 bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800">
+                    {ticket.subcategory}
+                  </span>
+                )}
+              </span>
             </div>
             <span className="text-[11px] text-slate-400 font-mono">
               Submitted: {ticket.createdAt}
@@ -167,6 +174,24 @@ export const TicketDetailView: React.FC<TicketDetailViewProps> = ({
             </span>
             <span className="font-semibold text-slate-800 mt-0.5 block">
               {ticket.requesterName}
+            </span>
+          </div>
+
+          <div>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+              Category
+            </span>
+            <span className="font-bold text-slate-900 mt-0.5 block">
+              {ticket.category}
+            </span>
+          </div>
+
+          <div>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+              Subcategory
+            </span>
+            <span className="font-semibold text-slate-800 mt-0.5 block">
+              {ticket.subcategory || '—'}
             </span>
           </div>
 

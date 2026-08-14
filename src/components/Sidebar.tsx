@@ -21,8 +21,7 @@ import {
   Sliders,
   ChevronRight,
   LogOut,
-  BarChart3,
-  X
+  BarChart3
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -86,17 +85,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         }`}
       >
-        {/* Close Button */}
-        <div className="flex justify-end mb-4">
-          <button
-            onClick={onCloseMobile}
-            className="p-2 rounded-lg bg-slate-800/50 hover:bg-slate-700/70 text-slate-300 hover:text-white transition-colors"
-            aria-label="Close sidebar"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
         <div className="space-y-6">
           {/* User Profile Summary Box */}
           <div className="bg-emerald-900/40 p-3 rounded-xl border border-emerald-800/60 flex items-center gap-3">

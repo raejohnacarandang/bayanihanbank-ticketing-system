@@ -27,6 +27,7 @@ import {
   addComment as localAddComment,
   assignTicket as localAssignTicket,
   createBranch as localCreateBranch,
+  createCategory as localCreateCategory,
   createState,
   createTicket as localCreateTicket,
   createUser as localCreateUser,
@@ -34,14 +35,18 @@ import {
   deleteUser as localDeleteUser,
   markAllNotificationsAsRead as localMarkAllNotificationsAsRead,
   markNotificationAsRead as localMarkNotificationAsRead,
+  setCurrentUser as localSetCurrentUser,
   updateBranch as localUpdateBranch,
-  updateTicketStatus as localUpdateTicketStatus,
+  updateCategory as localUpdateCategory,
   updateStaffAssignments as localUpdateStaffAssignments,
+  updateTicketStatus as localUpdateTicketStatus,
   updateUser as localUpdateUser,
 } from "./store";
 import type {
   CreateBranchParams,
+  CreateCategoryParams,
   CreateUserParams,
+  UpdateCategoryChanges,
   UpdateUserChanges,
 } from "./store";
 
@@ -297,8 +302,13 @@ class StorageService {
       this.cache.currentUser = json.user;
       this.mirror();
       return json.user;
-    } catch {
-      // Offline best-effort: clear the forced-change flag locally.
+    } catch (err) {
+      // Re-throw real API failures (wrong current password, CSRF, server
+      // errors) so the UI can show them instead of a misleading success.
+      // Only a pure network failure falls back to the local mirror.
+      if (!this.isNetworkError(err)) throw err;
+      // Offline best-effort: clear the forced-change flag locally. The server
+      // remains the source of truth, so the change only applies once online.
       this.cache.currentUser = {
         ...this.cache.currentUser,
         mustChangePassword: false,
@@ -379,7 +389,9 @@ class StorageService {
     subject: string;
     description: string;
     category: Ticket["category"];
+    subcategory?: string;
     attachmentName?: string;
+    requesterName?: string;
   }): Promise<Ticket> {
     try {
       const json = await this.api<{ ticket: Ticket }>("/api/tickets", {
@@ -602,6 +614,62 @@ class StorageService {
       this.cache = next;
       this.mirror();
       return next.branches[next.branches.length - 1];
+    }
+  }
+
+  public async createCategory(
+    category: CreateCategoryParams,
+  ): Promise<CategoryInfo> {
+    try {
+      const json = await this.api<{ category: CategoryInfo }>(
+        "/api/categories",
+        {
+          method: "POST",
+          body: JSON.stringify(category),
+        },
+      );
+      await this.refresh();
+      return json.category;
+    } catch (err) {
+      if (!this.isNetworkError(err)) throw err;
+      const next = localCreateCategory(
+        this.cache,
+        category,
+        this.cache.currentUser,
+      );
+      this.cache = next;
+      this.mirror();
+      return next.categories[next.categories.length - 1];
+    }
+  }
+
+  public async updateCategory(
+    categoryId: string,
+    changes: UpdateCategoryChanges,
+  ): Promise<CategoryInfo | undefined> {
+    try {
+      const json = await this.api<{ category?: CategoryInfo }>(
+        `/api/categories/${categoryId}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify(changes),
+        },
+      );
+      await this.refresh();
+      return (
+        json.category ??
+        this.cache.categories.find((c) => c.id === categoryId)
+      );
+    } catch (err) {
+      if (!this.isNetworkError(err)) throw err;
+      this.cache = localUpdateCategory(
+        this.cache,
+        categoryId,
+        changes,
+        this.cache.currentUser,
+      );
+      this.mirror();
+      return this.cache.categories.find((c) => c.id === categoryId);
     }
   }
 

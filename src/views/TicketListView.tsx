@@ -280,6 +280,7 @@ export const TicketListView: React.FC<TicketListViewProps> = ({
                   <th className="py-3.5 px-4">Category</th>
                   <th className="py-3.5 px-4">Status</th>
                   <th className="py-3.5 px-4">Assigned IT</th>
+                  <th className="py-3.5 px-4">Requester</th>
                   <th className="py-3.5 px-4">Submitted</th>
                   <th className="py-3.5 px-4 text-right">Action</th>
                 </tr>
@@ -300,7 +301,14 @@ export const TicketListView: React.FC<TicketListViewProps> = ({
                     <td className="py-3.5 px-4 max-w-xs truncate font-medium text-slate-900">
                       {ticket.subject}
                     </td>
-                    <td className="py-3.5 px-4 text-slate-600">{ticket.category}</td>
+                    <td className="py-3.5 px-4 text-slate-600">
+                      {ticket.category}
+                      {ticket.subcategory && (
+                        <span className="ml-1.5 text-[10px] font-mono text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded">
+                          {ticket.subcategory}
+                        </span>
+                      )}
+                    </td>
                     <td className="py-3.5 px-4">
                       <StatusBadge status={ticket.status} size="sm" />
                     </td>
@@ -310,6 +318,9 @@ export const TicketListView: React.FC<TicketListViewProps> = ({
                       ) : (
                         <span className="text-slate-400 italic">Unassigned</span>
                       )}
+                    </td>
+                    <td className="py-3.5 px-4 font-medium text-slate-800 whitespace-nowrap">
+                      {ticket.requesterName}
                     </td>
                     <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">
                       {ticket.createdAt}

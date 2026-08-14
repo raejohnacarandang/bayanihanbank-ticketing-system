@@ -38,6 +38,7 @@ import {
   addComment,
   assignTicket,
   createBranch,
+  createCategory,
   createTicket,
   createUser,
   deleteBranch,
@@ -46,6 +47,7 @@ import {
   markNotificationAsRead,
   setCurrentUser,
   updateBranch,
+  updateCategory,
   updateStaffAssignments,
   updateTicketStatus,
   updateUser,
@@ -88,6 +90,8 @@ import {
   updateAssignmentsSchema,
   createBranchSchema,
   updateBranchSchema,
+  createCategorySchema,
+  updateCategorySchema,
   validate,
 } from "./src/server/validation";
 import { setupSwagger } from "./src/server/swagger";
@@ -603,6 +607,34 @@ app.get("/api/categories", (_req: Request, res: Response) => {
   res.json({ categories: state.categories });
 });
 
+app.post(
+  "/api/categories",
+  validate(createCategorySchema),
+  async (req: Request, res: Response) => {
+    if (!requireAdmin(req, res)) return;
+    const { name, subcategory } = req.body;
+    const before = state;
+    const after = createCategory(state, { name, subcategory }, actor(req));
+    const created = after.categories[after.categories.length - 1];
+    await commit(res, before, after, { category: created });
+  },
+);
+
+app.patch(
+  "/api/categories/:id",
+  validate(updateCategorySchema),
+  async (req: Request, res: Response) => {
+    if (!requireAdmin(req, res)) return;
+    const changes = req.body;
+    const before = state;
+    const after = updateCategory(state, req.params.id, changes, actor(req));
+    if (after === before)
+      return res.status(404).json({ error: "Category not found" });
+    const updated = after.categories.find((c) => c.id === req.params.id);
+    await commit(res, before, after, { category: updated });
+  },
+);
+
 app.get("/api/notifications", (req: Request, res: Response) => {
   const viewer = actor(req);
   res.json({
@@ -630,7 +662,9 @@ app.post(
       subject: params.subject!,
       description: params.description!,
       category: params.category!,
+      subcategory: params.subcategory,
       attachmentName: params.attachmentName,
+      requesterName: params.requesterName,
       currentUser: actor(req),
     });
     const created = after.tickets[0];

@@ -86,12 +86,12 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header ref={headerRef} className="bg-gradient-to-r from-emerald-950 via-emerald-900 to-emerald-950 text-white border-b border-emerald-800/80 sticky top-0 z-30 shadow-md">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div className="px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         {/* Left Section: Mobile Menu Button & Brand Identity */}
         <div className="flex items-center gap-3">
           <button
             onClick={onToggleSidebar}
-            className="text-emerald-200 hover:text-white p-2 rounded-lg hover:bg-emerald-900 transition"
+            className="md:hidden text-emerald-200 hover:text-white p-2 rounded-lg hover:bg-emerald-900 transition"
             aria-label="Toggle navigation menu"
           >
             {isSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}

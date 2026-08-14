@@ -59,7 +59,7 @@ export interface Branch {
 export interface CategoryInfo {
   id: string;
   name: TicketCategory;
-  description: string;
+  subcategory: string;
   status: 'Active' | 'Proposed';
 }
 
@@ -97,6 +97,7 @@ export interface Ticket {
   subject: string;
   description: string;
   category: TicketCategory;
+  subcategory?: string;
   status: TicketStatus;
   requesterId: string;
   requesterName: string;
@@ -131,6 +132,7 @@ export interface AuditLog {
   actorRole: UserRole;
   action: string;
   targetId?: string;
+  requesterName?: string;
   details: string;
 }
 

@@ -56,6 +56,7 @@ const options: swaggerJSDoc.Options = {
             subject: { type: "string" },
             description: { type: "string" },
             category: { type: "string" },
+            subcategory: { type: "string" },
             status: {
               type: "string",
               enum: [
@@ -436,18 +437,8 @@ const options: swaggerJSDoc.Options = {
                   properties: {
                     subject: { type: "string", maxLength: 200 },
                     description: { type: "string", maxLength: 10000 },
-                    category: {
-                      type: "string",
-                      enum: [
-                        "Hardware",
-                        "Software",
-                        "Network",
-                        "Access",
-                        "Email",
-                        "Security",
-                        "Other",
-                      ],
-                    },
+                    category: { type: "string", maxLength: 100 },
+                    subcategory: { type: "string", maxLength: 300 },
                     attachmentName: { type: "string" },
                   },
                 },

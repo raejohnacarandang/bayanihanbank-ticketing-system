@@ -1,14 +1,17 @@
 import React, { useState } from 'react';
-import { User, TicketCategory, Ticket } from '../types';
-import { ArrowLeft, CheckCircle2, Upload, AlertCircle, FileText, Send, Building } from 'lucide-react';
+import { User, TicketCategory, CategoryInfo, Ticket } from '../types';
+import { ArrowLeft, CheckCircle2, AlertCircle, Send, Building } from 'lucide-react';
 
 interface CreateTicketViewProps {
   currentUser: User;
+  categories: CategoryInfo[];
   onSubmitTicket: (params: {
     subject: string;
     description: string;
     category: TicketCategory;
+    subcategory?: string;
     attachmentName?: string;
+    requesterName?: string;
   }) => Promise<Ticket>;
   onNavigateBack: () => void;
   onNavigateTicketDetail: (ticketId: string) => void;
@@ -16,32 +19,28 @@ interface CreateTicketViewProps {
 
 export const CreateTicketView: React.FC<CreateTicketViewProps> = ({
   currentUser,
+  categories,
   onSubmitTicket,
   onNavigateBack,
   onNavigateTicketDetail,
 }) => {
-  const [category, setCategory] = useState<TicketCategory>('Hardware');
+  const activeCategories = categories.filter((c) => c.status === 'Active');
+  const [category, setCategory] = useState<TicketCategory>(
+    activeCategories[0]?.name ?? 'Hardware',
+  );
+  const [subcategory, setSubcategory] = useState('');
   const [subject, setSubject] = useState('');
   const [description, setDescription] = useState('');
-  const [attachmentName, setAttachmentName] = useState<string>('');
+  const [requesterName, setRequesterName] = useState(currentUser.name);
   const [formError, setFormError] = useState('');
   const [createdTicket, setCreatedTicket] = useState<Ticket | null>(null);
 
-  const categoriesList: TicketCategory[] = [
-    'Hardware',
-    'Software',
-    'Network',
-    'Account & Access',
-    'Installation / Configuration',
-    'IT Equipment',
-    'Other IT Concern',
-  ];
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setAttachmentName(e.target.files[0].name);
-    }
-  };
+  const selectedCategory = activeCategories.find((c) => c.name === category);
+  const subcategoriesList =
+    selectedCategory?.subcategory
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean) ?? [];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,7 +60,8 @@ export const CreateTicketView: React.FC<CreateTicketViewProps> = ({
       subject: subject.trim(),
       description: description.trim(),
       category,
-      attachmentName: attachmentName || undefined,
+      subcategory: subcategory.trim() || undefined,
+      requesterName: requesterName.trim() || currentUser.name,
     });
 
     setCreatedTicket(ticket);
@@ -164,8 +164,13 @@ export const CreateTicketView: React.FC<CreateTicketViewProps> = ({
                 <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
                   Requester Employee Name
                 </label>
-                <div className="text-sm font-bold text-slate-800">
-                  {currentUser.name}
+                <div className="flex items-center gap-2">
+<input
+                      type="text"
+                      value={requesterName}
+                      onChange={(e) => setRequesterName(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                  />
                 </div>
               </div>
             </div>
@@ -177,12 +182,39 @@ export const CreateTicketView: React.FC<CreateTicketViewProps> = ({
               </label>
               <select
                 value={category}
-                onChange={(e) => setCategory(e.target.value as TicketCategory)}
+                onChange={(e) => {
+                  setCategory(e.target.value as TicketCategory);
+                  setSubcategory('');
+                }}
                 className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600"
               >
-                {categoriesList.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
+                {activeCategories.map((cat) => (
+                  <option key={cat.id} value={cat.name}>
+                    {cat.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Subcategory */}
+            <div>
+              <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">
+                Subcategory
+              </label>
+              <select
+                value={subcategory}
+                onChange={(e) => setSubcategory(e.target.value)}
+                disabled={subcategoriesList.length === 0}
+                className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 disabled:bg-slate-50 disabled:text-slate-400"
+              >
+                <option value="">
+                  {subcategoriesList.length === 0
+                    ? 'No subcategories for this category'
+                    : 'Select subcategory (optional)'}
+                </option>
+                {subcategoriesList.map((sub, i) => (
+                  <option key={i} value={sub}>
+                    {sub}
                   </option>
                 ))}
               </select>
@@ -214,36 +246,6 @@ export const CreateTicketView: React.FC<CreateTicketViewProps> = ({
                 placeholder="Please describe the problem or request in detail. Include any error messages displayed, station numbers, or steps leading up to the issue."
                 className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 leading-relaxed"
               />
-            </div>
-
-            {/* File Attachment Simulator */}
-            <div>
-              <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">
-                Attachment (Optional)
-              </label>
-              <div className="border-2 border-dashed border-slate-300 rounded-xl p-4 text-center hover:bg-slate-50 transition cursor-pointer relative">
-                <input
-                  type="file"
-                  onChange={handleFileChange}
-                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                />
-                <div className="flex flex-col items-center justify-center gap-1.5">
-                  <Upload className="w-6 h-6 text-slate-400" />
-                  {attachmentName ? (
-                    <div className="text-xs font-bold text-emerald-900 flex items-center gap-1">
-                      <FileText className="w-4 h-4 text-emerald-600" />
-                      <span>{attachmentName}</span>
-                    </div>
-                  ) : (
-                    <span className="text-xs font-medium text-slate-600">
-                      Click or drag a file here (Screenshots, photos, or documents)
-                    </span>
-                  )}
-                  <span className="text-[10px] text-slate-400">
-                    Supported: PNG, JPG, PDF, DOCX (Max 10MB)
-                  </span>
-                </div>
-              </div>
             </div>
 
             {/* Submit Button */}

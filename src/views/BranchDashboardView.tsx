@@ -69,7 +69,7 @@ export const BranchDashboardView: React.FC<BranchDashboardViewProps> = ({
             {getGreetingTime()}, {currentUser.name.split(' ')[0]}
           </h1>
           <p className="text-sm text-emerald-200/90 mt-1 font-medium">
-            {currentUser.branchName || 'Unisan Branch'} — IT Requests & Service Dashboard
+            {currentUser.branchName || 'Alabang'} — IT Requests & Service Dashboard
           </p>
         </div>
 
@@ -151,7 +151,7 @@ export const BranchDashboardView: React.FC<BranchDashboardViewProps> = ({
         <div className="p-4 sm:p-6 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50/50">
           <div>
             <h3 className="text-base font-bold text-slate-900">
-              {currentUser.branchName || 'Unisan Branch'} IT Request Tickets
+              {currentUser.branchName || 'Alabang'} IT Request Tickets
             </h3>
             <p className="text-xs text-slate-500">
               Showing tickets submitted by staff at this branch location

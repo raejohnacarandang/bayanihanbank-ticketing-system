@@ -21,7 +21,7 @@ export const GuidedDemoModal: React.FC<GuidedDemoModalProps> = ({
     {
       num: 1,
       title: 'Login as Branch User',
-      description: 'Log in as Juan Dela Cruz (Unisan Branch) using branch.user credentials.',
+      description: 'Log in as Juan Dela Cruz (Gumaca Branch) using branch.user credentials.',
       roleNeeded: 'BRANCH_USER' as UserRole,
       actionText: 'Switch to Branch User (Juan)',
       actionView: 'dashboard',

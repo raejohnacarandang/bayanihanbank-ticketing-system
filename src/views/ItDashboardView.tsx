@@ -209,6 +209,7 @@ export const ItDashboardView: React.FC<ItDashboardViewProps> = ({
                   <th className="py-3 px-4">Category</th>
                   <th className="py-3 px-4">Status</th>
                   <th className="py-3 px-4">Assigned To</th>
+                  <th className="py-3 px-4">Requester</th>
                   <th className="py-3 px-4">Submitted</th>
                   <th className="py-3 px-4 text-right">Action</th>
                 </tr>
@@ -237,6 +238,9 @@ export const ItDashboardView: React.FC<ItDashboardViewProps> = ({
                       {ticket.assignedToName || (
                         <span className="text-amber-700 font-semibold italic">Unassigned</span>
                       )}
+                    </td>
+                    <td className="py-3 px-4 text-slate-500 whitespace-nowrap">
+                      {ticket.requesterName}
                     </td>
                     <td className="py-3 px-4 text-slate-500 whitespace-nowrap">
                       {ticket.createdAt}

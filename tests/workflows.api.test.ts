@@ -1123,7 +1123,7 @@ describe("Password workflows (API)", () => {
 
 describe("Branch user workflow (API)", () => {
   it("creates a ticket that is auto-assigned to the IT specialist covering the branch", async () => {
-    const token = await login(harness.app, "branch.user"); // Juan Dela Cruz, br-001
+    const token = await login(harness.app, "branch.user"); // Juan Dela Cruz, br-011 (Gumaca)
     const res = await request(harness.app)
       .post("/api/tickets")
       .set(bearer(token))
@@ -1137,7 +1137,7 @@ describe("Branch user workflow (API)", () => {
     expect(res.body.ticket.status).toBe("Assigned");
     expect(res.body.ticket.assignedToId).toBe("usr-003");
     expect(res.body.ticket.requesterId).toBe("usr-001");
-    expect(res.body.ticket.branchId).toBe("br-001");
+    expect(res.body.ticket.branchId).toBe("br-011");
   });
 
   it("rejects ticket creation missing required fields", async () => {
@@ -1149,13 +1149,14 @@ describe("Branch user workflow (API)", () => {
     expect(res.status).toBe(400);
   });
 
-  it("rejects ticket creation with an invalid category", async () => {
+  it("accepts ticket creation with a custom category (dynamic taxonomy)", async () => {
     const token = await login(harness.app, "branch.user");
     const res = await request(harness.app)
       .post("/api/tickets")
       .set(bearer(token))
       .send({ subject: "X", description: "Y", category: "NotACategory" });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(200);
+    expect(res.body.ticket.category).toBe("NotACategory");
   });
 
   it("only exposes tickets from the branch or requested by the user", async () => {
@@ -1165,8 +1166,8 @@ describe("Branch user workflow (API)", () => {
       .set(bearer(token));
     expect(res.status).toBe(200);
     const ids = res.body.tickets.map((t: { id: string }) => t.id).sort();
-    // br-001 (IT-000122, IT-000125) + requested by usr-001 (IT-000123, IT-000125)
-    expect(ids).toEqual(["IT-000122", "IT-000123", "IT-000125"]);
+    // Gumaca (br-011: IT-000122, IT-000124, IT-000125) + requested by usr-001 (IT-000123, IT-000125)
+    expect(ids).toEqual(["IT-000122", "IT-000123", "IT-000124", "IT-000125"]);
   });
 
   it("returns 404 for a ticket outside the branch scope", async () => {
@@ -1187,11 +1188,11 @@ describe("Branch user workflow (API)", () => {
     ]);
 
     const byBranch = await request(harness.app)
-      .get("/api/tickets?branchId=br-001")
+      .get("/api/tickets?branchId=br-011")
       .set(bearer(token));
     expect(
       byBranch.body.tickets.map((t: { id: string }) => t.id).sort(),
-    ).toEqual(["IT-000122", "IT-000125"]);
+    ).toEqual(["IT-000122", "IT-000124", "IT-000125"]);
 
     const byRequester = await request(harness.app)
       .get("/api/tickets?requesterId=usr-001")
@@ -1209,11 +1210,12 @@ describe("Branch user workflow (API)", () => {
   });
 
   it("hides internal IT comments from branch users but not from IT staff", async () => {
-    const itToken = await login(harness.app, "it.staff");
-    // Create a ticket visible to both it.staff (requester) and branch.user (br-001).
+    const branchToken = await login(harness.app, "branch.user");
+    // Create a ticket as branch.user (br-011 Gumaca); it auto-assigns to
+    // it.staff (Mark Reyes) via branch coverage, so both roles can see it.
     const createRes = await request(harness.app)
       .post("/api/tickets")
-      .set(bearer(itToken))
+      .set(bearer(branchToken))
       .send({
         subject: "Comment visibility",
         description: "Checking comment visibility",
@@ -1221,6 +1223,7 @@ describe("Branch user workflow (API)", () => {
       });
     const ticketId = createRes.body.ticket.id;
 
+    const itToken = await login(harness.app, "it.staff");
     await request(harness.app)
       .post(`/api/tickets/${ticketId}/comments`)
       .set(bearer(itToken))
@@ -1238,7 +1241,6 @@ describe("Branch user workflow (API)", () => {
       ),
     ).toBe(true);
 
-    const branchToken = await login(harness.app, "branch.user"); // br-001
     const branchComments = await request(harness.app)
       .get(`/api/tickets/${ticketId}/comments`)
       .set(bearer(branchToken));
@@ -1368,7 +1370,7 @@ describe("IT staff workflow (API)", () => {
     const users = await request(harness.app)
       .get("/api/users")
       .set(bearer(token));
-    expect(users.body.users).toHaveLength(6);
+    expect(users.body.users).toHaveLength(34);
 
     const logs = await request(harness.app)
       .get("/api/audit-logs")
@@ -1676,7 +1678,7 @@ describe("Auditor workflow (API)", () => {
       .set(bearer(token));
     expect(state.status).toBe(200);
     expect(state.body.tickets).toHaveLength(5);
-    expect(state.body.users).toHaveLength(6);
+    expect(state.body.users).toHaveLength(34);
     expect(state.body.auditLogs.length).toBeGreaterThan(0);
     expect(state.body.currentUser.role).toBe("AUDITOR");
   });
@@ -1716,7 +1718,7 @@ describe("Auditor workflow (API)", () => {
       .send({
         subject: "Audit observation",
         description: "Noted during audit.",
-        category: "Other",
+        category: "Other IT Concern",
       });
     expect(res.status).toBe(200);
   });

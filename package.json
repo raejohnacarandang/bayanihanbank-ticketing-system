@@ -13,6 +13,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "backup": "node scripts/backup.mjs",
+    "reset:data": "node scripts/reset-demo-data.mjs",
     "force-password-reset": "node scripts/force-password-reset.mjs",
     "lint": "eslint . --ext ts,tsx",
     "typecheck": "tsc --noEmit",
@@ -46,7 +47,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
+    "@eslint/js": "^9.39.5",
     "@playwright/test": "^1.62.1",
     "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",

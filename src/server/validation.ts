@@ -30,16 +30,13 @@ export const createTicketSchema = z.object({
     .string()
     .min(1, "Description is required")
     .max(10000, "Description too long"),
-  category: z.enum([
-    "Hardware",
-    "Software",
-    "Network",
-    "Access",
-    "Email",
-    "Security",
-    "Other",
-  ]),
+  category: z
+    .string()
+    .min(1, "Category is required")
+    .max(100, "Category too long"),
+  subcategory: z.string().max(300, "Subcategory too long").optional(),
   attachmentName: z.string().optional(),
+  requesterName: z.string().max(100, "Requester name too long").optional(),
 });
 
 export const updateTicketStatusSchema = z.object({
@@ -113,6 +110,10 @@ export const updateAssignmentsSchema = z.object({
   assignments: z.array(
     z.object({
       branchId: z.string().min(1),
+      branchName: z.string().min(1).optional(),
+      durationMonths: z.number().int().positive().optional(),
+      assignedAt: z.string().optional(),
+      expiresAt: z.string().optional(),
       isPrimary: z.boolean().optional(),
     }),
   ),
@@ -131,6 +132,24 @@ export const createBranchSchema = z.object({
     .optional(),
   status: z.enum(["Active", "Inactive"]).default("Active"),
   userCount: z.number().int().min(0).optional(),
+});
+
+export const createCategorySchema = z.object({
+  name: z
+    .string()
+    .min(1, "Category name is required")
+    .max(100, "Name too long"),
+  subcategory: z.string().max(500, "Subcategory too long").optional(),
+});
+
+export const updateCategorySchema = z.object({
+  name: z
+    .string()
+    .min(1, "Category name is required")
+    .max(100, "Name too long")
+    .optional(),
+  subcategory: z.string().max(500, "Subcategory too long").optional(),
+  status: z.enum(["Active", "Proposed"]).optional(),
 });
 
 export const updateBranchSchema = z.object({

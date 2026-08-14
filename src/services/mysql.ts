@@ -39,7 +39,21 @@ import {
 
 dotenv.config();
 
-const dbName = process.env.DB_NAME || "bayanihan_bank";
+function getDbName(): string {
+  return process.env.DB_NAME || "bayanihan_bank";
+}
+
+// Destructive operations (resetState) are only allowed against test databases
+// or when explicitly enabled via ALLOW_DB_RESET=1. This prevents test runs or
+// the /api/reset endpoint from silently wiping real (non-test) data.
+function isSafeToReset(): boolean {
+  const db = getDbName();
+  return (
+    process.env.NODE_ENV === "test" ||
+    db.endsWith("_test") ||
+    process.env.ALLOW_DB_RESET === "1"
+  );
+}
 
 let pool: Pool;
 
@@ -61,7 +75,7 @@ function createPool(database?: string): Pool {
 // ---------------------------------------------------------------------------
 
 const DDL: string[] = [
-  `CREATE DATABASE IF NOT EXISTS \`${dbName}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci`,
+  `CREATE DATABASE IF NOT EXISTS \`${getDbName()}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci`,
 
   `CREATE TABLE IF NOT EXISTS users (
     id VARCHAR(50) PRIMARY KEY,
@@ -90,7 +104,7 @@ const DDL: string[] = [
   `CREATE TABLE IF NOT EXISTS categories (
     id VARCHAR(50) PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
-    description TEXT,
+    subcategory TEXT,
     status VARCHAR(20) NOT NULL
   )`,
 
@@ -99,6 +113,7 @@ const DDL: string[] = [
     subject VARCHAR(300) NOT NULL,
     description TEXT,
     category VARCHAR(100) NOT NULL,
+    subcategory VARCHAR(300),
     status VARCHAR(20) NOT NULL,
     requesterId VARCHAR(50),
     requesterName VARCHAR(150),
@@ -171,11 +186,11 @@ const DDL: string[] = [
 export async function initDatabase(): Promise<void> {
   pool = createPool();
   await pool.query(
-    `CREATE DATABASE IF NOT EXISTS \`${dbName}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci`,
+    `CREATE DATABASE IF NOT EXISTS \`${getDbName()}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci`,
   );
   await pool.end();
 
-  pool = createPool(dbName);
+  pool = createPool(getDbName());
   for (const ddl of DDL) {
     await pool.query(ddl);
   }
@@ -219,6 +234,14 @@ export async function initDatabase(): Promise<void> {
   } catch {
     // Column already dropped.
   }
+  // Migration: add the subcategory column to pre-existing tickets tables.
+  try {
+    await pool.query(
+      "ALTER TABLE tickets ADD COLUMN subcategory VARCHAR(300) NULL",
+    );
+  } catch {
+    // Column already added.
+  }
   // Migration: drop the legacy SLA columns from pre-existing categories tables.
   try {
     await pool.query("ALTER TABLE categories DROP COLUMN slaTargetHours");
@@ -229,6 +252,14 @@ export async function initDatabase(): Promise<void> {
     await pool.query("ALTER TABLE categories DROP COLUMN slaHours");
   } catch {
     // Column already dropped.
+  }
+  // Migration: rename the legacy description column to subcategory.
+  try {
+    await pool.query(
+      "ALTER TABLE categories CHANGE description subcategory TEXT NULL",
+    );
+  } catch {
+    // Column already renamed.
   }
   // Migration: drop the branch code column (bank has no branch codes).
   try {
@@ -315,8 +346,8 @@ export async function seedIfEmpty(force = false): Promise<void> {
 
       for (const c of INITIAL_CATEGORIES) {
         await conn.query(
-          "INSERT INTO categories (id, name, description, status) VALUES (?, ?, ?, ?)",
-          [c.id, c.name, c.description, c.status],
+          "INSERT INTO categories (id, name, subcategory, status) VALUES (?, ?, ?, ?)",
+          [c.id, c.name, c.subcategory, c.status],
         );
       }
 
@@ -394,7 +425,7 @@ export async function seedIfEmpty(force = false): Promise<void> {
     );
 
     await conn.commit();
-    console.log(`[mysql] Seeded database "${dbName}" with initial data.`);
+    console.log(`[mysql] Seeded database "${getDbName()}" with initial data.`);
   } catch (err) {
     await conn.rollback();
     throw err;
@@ -410,15 +441,16 @@ interface Queryable {
 async function insertTicket(conn: Queryable, t: Ticket): Promise<void> {
   await conn.query(
     `INSERT INTO tickets
-      (id, subject, description, category, status, requesterId, requesterName,
+      (id, subject, description, category, subcategory, status, requesterId, requesterName,
        branchId, branchName, assignedToId, assignedToName, createdAt, createdAtISO,
        updatedAt, resolutionNotes, resolvedAt, closedAt, attachments)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       t.id,
       t.subject,
       t.description,
       t.category,
+      t.subcategory ?? null,
       t.status,
       t.requesterId,
       t.requesterName,
@@ -582,8 +614,8 @@ export async function saveState(state: AppState): Promise<void> {
 
     for (const c of state.categories) {
       await conn.query(
-        "INSERT INTO categories (id, name, description, status) VALUES (?, ?, ?, ?)",
-        [c.id, c.name, c.description, c.status],
+        "INSERT INTO categories (id, name, subcategory, status) VALUES (?, ?, ?, ?)",
+        [c.id, c.name, c.subcategory, c.status],
       );
     }
 
@@ -729,25 +761,26 @@ async function upsertCategoryRow(
   c: CategoryInfo,
 ): Promise<void> {
   await conn.query(
-    `INSERT INTO categories (id, name, description, status)
+    `INSERT INTO categories (id, name, subcategory, status)
      VALUES (?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE
-       name = VALUES(name), description = VALUES(description),
+       name = VALUES(name), subcategory = VALUES(subcategory),
        status = VALUES(status)`,
-    [c.id, c.name, c.description, c.status],
+    [c.id, c.name, c.subcategory, c.status],
   );
 }
 
 async function upsertTicketRow(conn: Queryable, t: Ticket): Promise<void> {
   await conn.query(
     `INSERT INTO tickets
-       (id, subject, description, category, status, requesterId, requesterName,
+       (id, subject, description, category, subcategory, status, requesterId, requesterName,
         branchId, branchName, assignedToId, assignedToName, createdAt, createdAtISO,
         updatedAt, resolutionNotes, resolvedAt, closedAt, attachments)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE
        subject = VALUES(subject), description = VALUES(description),
-       category = VALUES(category), status = VALUES(status),
+       category = VALUES(category), subcategory = VALUES(subcategory),
+       status = VALUES(status),
        requesterId = VALUES(requesterId), requesterName = VALUES(requesterName),
        branchId = VALUES(branchId), branchName = VALUES(branchName),
        assignedToId = VALUES(assignedToId), assignedToName = VALUES(assignedToName),
@@ -760,6 +793,7 @@ async function upsertTicketRow(conn: Queryable, t: Ticket): Promise<void> {
       t.subject,
       t.description,
       t.category,
+      t.subcategory ?? null,
       t.status,
       t.requesterId,
       t.requesterName,
@@ -947,6 +981,11 @@ export async function persistDiff(
 // ---------------------------------------------------------------------------
 
 export async function resetState(): Promise<AppState> {
+  if (!isSafeToReset()) {
+    throw new Error(
+      `Refusing to reset database "${getDbName()}": destructive reset is only allowed on test databases. Set ALLOW_DB_RESET=1 to force.`,
+    );
+  }
   const admin =
     INITIAL_USERS.find((u) => u.username === "admin") ?? INITIAL_USERS[0];
   const conn = await pool.getConnection();

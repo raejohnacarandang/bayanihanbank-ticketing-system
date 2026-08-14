@@ -40,7 +40,7 @@ import type { AppState, BranchAssignment, User } from "../src/types";
 const fresh = (): AppState => createState();
 
 const branchUser = (): User =>
-  createState().users.find((u) => u.username === "branch.user")!; // Juan Dela Cruz (br-001)
+  createState().users.find((u) => u.username === "branch.user")!; // Juan Dela Cruz (br-011 Gumaca)
 const itStaff1 = (): User =>
   createState().users.find((u) => u.username === "it.staff")!; // Mark Reyes
 const itStaff2 = (): User =>
@@ -93,9 +93,9 @@ describe("Branch user workflow (store)", () => {
     const created = next.tickets[0];
     expect(created.id).toBe("IT-000126");
     expect(created.status).toBe("Assigned");
-    expect(created.assignedToId).toBe(itStaff1().id); // Mark Reyes covers br-001
+    expect(created.assignedToId).toBe(itStaff1().id); // Mark Reyes covers br-011 (Gumaca)
     expect(created.requesterId).toBe(branchUser().id);
-    expect(created.branchId).toBe("br-001");
+    expect(created.branchId).toBe("br-011");
     expect(next.ticketCounter).toBe(127);
   });
 
@@ -116,7 +116,7 @@ describe("Branch user workflow (store)", () => {
     expect(next.tickets[0].assignedToId).toBeUndefined();
   });
 
-  it("notifies every IT specialist and administrator, plus the assigned staff", () => {
+  it("notifies only administrators and the assigned IT specialist", () => {
     const state = fresh();
     const next = createTicket(state, {
       subject: "Notify test",
@@ -124,13 +124,18 @@ describe("Branch user workflow (store)", () => {
       category: "Software",
       currentUser: branchUser(),
     });
-    const supportIds = next.users
-      .filter((u) => u.role === "IT_STAFF" || u.role === "ADMINISTRATOR")
-      .map((u) => u.id);
+    const expectedIds = [
+      ...next.users
+        .filter((u) => u.role === "ADMINISTRATOR")
+        .map((u) => u.id),
+      ...(next.tickets[0].assignedToId
+        ? [next.tickets[0].assignedToId!]
+        : []),
+    ];
     const notified = next.notifications
       .filter((n) => n.ticketId === "IT-000126")
       .map((n) => n.userId);
-    expect(new Set(notified)).toEqual(new Set(supportIds));
+    expect(new Set(notified)).toEqual(new Set(expectedIds));
   });
 
   it("records creation timeline and CREATE_TICKET audit entry", () => {

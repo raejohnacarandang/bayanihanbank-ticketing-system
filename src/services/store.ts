@@ -7,6 +7,7 @@ import {
   AuditLog,
   Branch,
   BranchAssignment,
+  CategoryInfo,
   Comment,
   NotificationItem,
   Ticket,
@@ -146,8 +147,10 @@ export interface CreateTicketParams {
   subject: string;
   description: string;
   category: TicketCategory;
+  subcategory?: string;
   attachmentName?: string;
   currentUser: User;
+  requesterName?: string;
 }
 
 export function createTicket(state: AppState, params: CreateTicketParams): AppState {
@@ -165,11 +168,12 @@ export function createTicket(state: AppState, params: CreateTicketParams): AppSt
     subject: params.subject,
     description: params.description,
     category: params.category,
+    subcategory: params.subcategory?.trim() || undefined,
     status: assignedStaff ? 'Assigned' : 'Pending',
     requesterId: params.currentUser.id,
-    requesterName: params.currentUser.name,
+    requesterName: params.requesterName ?? params.currentUser.name,
     branchId: params.currentUser.branchId || 'br-001',
-    branchName: params.currentUser.branchName || 'Unisan Branch',
+    branchName: params.currentUser.branchName || 'Alabang',
     assignedToId: assignedStaff?.id,
     assignedToName: assignedStaff?.name,
     createdAt: nowStr,
@@ -198,7 +202,7 @@ export function createTicket(state: AppState, params: CreateTicketParams): AppSt
     actorName: params.currentUser.name,
     actorRole: params.currentUser.role,
     action: 'Ticket submitted',
-    details: `Category: ${params.category}`,
+    details: `Category: ${params.category}${params.subcategory ? ` / Subcategory: ${params.subcategory}` : ''}`,
     type: 'creation',
   });
 
@@ -237,12 +241,12 @@ export function createTicket(state: AppState, params: CreateTicketParams): AppSt
     });
   }
 
-  // Notify every IT specialist member and administrator, not just one person.
-  const supportUsers = next.users.filter(
-    (u) => u.role === 'IT_STAFF' || u.role === 'ADMINISTRATOR'
-  );
-  for (const u of supportUsers) {
-    // The auto-assigned staff member already received a dedicated notification.
+  // Notify every administrator. The auto-assigned IT specialist (if any) already
+  // received a dedicated notification above; unassigned IT staff are not pinged
+  // until the ticket is actually assigned to them.
+  const adminUsers = next.users.filter((u) => u.role === 'ADMINISTRATOR');
+  for (const u of adminUsers) {
+    // An admin who happens to be the assignee already got the dedicated notification.
     if (assignedStaff && u.id === assignedStaff.id) continue;
     next = withNotification(next, {
       userId: u.id,
@@ -708,6 +712,78 @@ export function deleteBranch(state: AppState, branchId: string, currentUser: Use
     action: 'DELETE_BRANCH',
     targetId: branchId,
     details: `Removed branch ${branch.name}`,
+  });
+
+  return next;
+}
+
+export interface CreateCategoryParams {
+  name: string;
+  subcategory: string;
+}
+
+export function createCategory(
+  state: AppState,
+  params: CreateCategoryParams,
+  currentUser: User,
+): AppState {
+  const id = nextId('cat', state);
+  const category: CategoryInfo = {
+    id,
+    name: params.name.trim() as CategoryInfo['name'],
+    subcategory: params.subcategory?.trim() ?? '',
+    status: 'Active',
+  };
+
+  let next: AppState = {
+    ...state,
+    categories: [...state.categories, category],
+  };
+
+  next = withAudit(next, {
+    actorName: currentUser.name,
+    actorRole: currentUser.role,
+    action: 'CREATE_CATEGORY',
+    targetId: id,
+    details: `Added category ${category.name}`,
+  });
+
+  return next;
+}
+
+export interface UpdateCategoryChanges {
+  name?: string;
+  subcategory?: string;
+  status?: CategoryInfo['status'];
+}
+
+export function updateCategory(
+  state: AppState,
+  categoryId: string,
+  changes: UpdateCategoryChanges,
+  currentUser: User,
+): AppState {
+  const index = state.categories.findIndex((c) => c.id === categoryId);
+  if (index === -1) return state;
+
+  const categories = [...state.categories];
+  categories[index] = {
+    ...categories[index],
+    ...changes,
+    name:
+      (changes.name?.trim() as CategoryInfo['name']) ??
+      categories[index].name,
+    subcategory: changes.subcategory?.trim() ?? categories[index].subcategory,
+  };
+
+  let next: AppState = { ...state, categories };
+
+  next = withAudit(next, {
+    actorName: currentUser.name,
+    actorRole: currentUser.role,
+    action: 'UPDATE_CATEGORY',
+    targetId: categoryId,
+    details: `Updated category ${categories[index].name}`,
   });
 
   return next;

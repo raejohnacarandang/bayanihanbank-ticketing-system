@@ -24,7 +24,9 @@ import {
 import { NotificationToasts, ToastItem } from "./components/NotificationToasts";
 import type {
   CreateBranchParams,
+  CreateCategoryParams,
   CreateUserParams,
+  UpdateCategoryChanges,
   UpdateUserChanges,
 } from "./services/store";
 import { Header } from "./components/Header";
@@ -34,7 +36,6 @@ import { GuidedDemoModal } from "./components/GuidedDemoModal";
 import { LoginView } from "./views/LoginView";
 import { ChangePasswordView } from "./views/ChangePasswordView";
 import { BranchDashboardView } from "./views/BranchDashboardView";
-import { CreateTicketView } from "./views/CreateTicketView";
 import { TicketListView } from "./views/TicketListView";
 import { TicketDetailView } from "./views/TicketDetailView";
 import { ItDashboardView } from "./views/ItDashboardView";
@@ -42,6 +43,7 @@ import { AdminDashboardView } from "./views/AdminDashboardView";
 import { NotificationsView } from "./views/NotificationsView";
 import { ProfileView } from "./views/ProfileView";
 import { ReportsView } from "./views/ReportsView";
+import { CreateTicketView } from "./views/CreateTicketView";
 import { WallboardView } from "./views/WallboardView";
 
 export default function App() {
@@ -83,6 +85,20 @@ export default function App() {
     primeAudio();
   }, []);
 
+  /**
+   * Mark already-read notifications as seen without dropping ids that were
+   * flagged while storage.init() was still resolving (polling/SSE effects run
+   * concurrently with the async restore). Replacing the ref wholesale would
+   * re-trigger the same notifications as duplicate toasts with identical keys.
+   */
+  const seedSeenNotifIds = useCallback(() => {
+    const next = new Set(seenNotifIds.current);
+    for (const n of storage.getNotifications(storage.getCurrentUser().id)) {
+      if (n.read) next.add(n.id);
+    }
+    seenNotifIds.current = next;
+  }, []);
+
   /** Open a ticket from a notification popup / toast. */
   const openFromNotification = useCallback(
     (notificationId: string, ticketId: string) => {
@@ -113,7 +129,11 @@ export default function App() {
     for (const n of fresh) seenNotifIds.current.add(n.id);
     playChime();
     for (const n of fresh.slice(0, 5)) {
-      setToasts((prev) => [...prev, { id: n.id, notification: n }]);
+      setToasts((prev) =>
+        prev.some((t) => t.id === n.id)
+          ? prev
+          : [...prev, { id: n.id, notification: n }],
+      );
       browserNotification(n.title, n.message, () =>
         openFromNotification(n.id, n.ticketId),
       );
@@ -142,12 +162,7 @@ export default function App() {
         setIsLoggedIn(true);
         // Only pre-see notifications that are already read; unread ones will
         // trigger the alarm + popups below.
-        seenNotifIds.current = new Set(
-          storage
-            .getNotifications(storage.getCurrentUser().id)
-            .filter((n) => n.read)
-            .map((n) => n.id),
-        );
+        seedSeenNotifIds();
         detectNewNotifications();
       } else {
         setIsLoggedIn(false);
@@ -157,7 +172,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [refreshData, detectNewNotifications]);
+  }, [refreshData, detectNewNotifications, seedSeenNotifIds]);
 
   // Keep state in sync with the URL (browser back/forward, deep links)
   useEffect(() => {
@@ -247,12 +262,7 @@ export default function App() {
     refreshData();
     // Only pre-see notifications that are already read; unread ones will
     // trigger the alarm + popups below.
-    seenNotifIds.current = new Set(
-      storage
-        .getNotifications(user.id)
-        .filter((n) => n.read)
-        .map((n) => n.id),
-    );
+    seedSeenNotifIds();
     requestNotificationPermission();
     detectNewNotifications();
     // Kiosk/control-room screens: stay on the wallboard they opened on.
@@ -331,7 +341,9 @@ export default function App() {
     subject: string;
     description: string;
     category: TicketCategory;
+    subcategory?: string;
     attachmentName?: string;
+    requesterName?: string;
   }): Promise<Ticket> => {
     if (isViewOnly) throw new Error("Auditors have read-only access.");
     const newTicket = await storage.createTicket(params);
@@ -423,6 +435,31 @@ export default function App() {
     }
   };
 
+  const handleCreateCategory = async (category: CreateCategoryParams) => {
+    try {
+      await storage.createCategory(category);
+      refreshData();
+    } catch (err) {
+      window.alert(
+        err instanceof Error ? err.message : "Failed to create category.",
+      );
+    }
+  };
+
+  const handleUpdateCategory = async (
+    categoryId: string,
+    changes: UpdateCategoryChanges,
+  ) => {
+    try {
+      await storage.updateCategory(categoryId, changes);
+      refreshData();
+    } catch (err) {
+      window.alert(
+        err instanceof Error ? err.message : "Failed to update category.",
+      );
+    }
+  };
+
   const handleUpdateBranch = async (
     branchId: string,
     changes: Partial<Branch>,
@@ -450,12 +487,17 @@ export default function App() {
 
   const handleNavigateTicketDetail = (ticketId: string) => {
     // Notifications may reference a user (e.g. password-reset requests) rather
-    // than a ticket — in that case send the admin to the Users directory
-    // instead of a blank ticket page.
+    // than a ticket. Only administrators should be routed to the Users
+    // directory for those. A ticket may also be missing from the viewer's
+    // scope (IT staff do not see unassigned tickets) — in that case do not
+    // push a non-admin onto a page they are not allowed to see.
     if (!storage.getTicketById(ticketId)) {
-      setAdminTab("users");
-      setActiveView("users");
-      navigate(pathForView("users", "users"));
+      const isUserRef = allUsers.some((u) => u.id === ticketId);
+      if (isUserRef && currentUser.role === "ADMINISTRATOR") {
+        setAdminTab("users");
+        setActiveView("users");
+        navigate(pathForView("users", "users"));
+      }
       return;
     }
     setSelectedTicketId(ticketId);
@@ -552,7 +594,7 @@ export default function App() {
       />
 
       {/* Main Body Layout */}
-      <div className="flex-1 flex max-w-7xl mx-auto w-full">
+      <div className="flex-1 flex w-full">
         {/* Role-Specific Navigation Sidebar */}
         <Sidebar
           currentUser={currentUser}
@@ -616,6 +658,8 @@ export default function App() {
                   onUpdateUser={handleUpdateUser}
                   onDeleteUser={handleDeleteUser}
                   onCreateBranch={handleCreateBranch}
+                  onCreateCategory={handleCreateCategory}
+                  onUpdateCategory={handleUpdateCategory}
                   onUpdateBranch={handleUpdateBranch}
                   onDeleteBranch={handleDeleteBranch}
                   onUpdateStaffAssignments={handleUpdateStaffAssignments}
@@ -649,6 +693,7 @@ export default function App() {
           {activeView === "new_request" && (
             <CreateTicketView
               currentUser={currentUser}
+              categories={storage.getCategories()}
               onSubmitTicket={handleCreateTicket}
               onNavigateBack={() => go("dashboard")}
               onNavigateTicketDetail={handleNavigateTicketDetail}
@@ -751,6 +796,8 @@ export default function App() {
               onUpdateUser={handleUpdateUser}
               onDeleteUser={handleDeleteUser}
               onCreateBranch={handleCreateBranch}
+              onCreateCategory={handleCreateCategory}
+              onUpdateCategory={handleUpdateCategory}
               onUpdateBranch={handleUpdateBranch}
               onDeleteBranch={handleDeleteBranch}
               onUpdateStaffAssignments={handleUpdateStaffAssignments}

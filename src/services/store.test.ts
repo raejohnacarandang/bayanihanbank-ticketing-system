@@ -31,13 +31,13 @@ describe('createTicket', () => {
     expect(created.id).toBe('IT-000126');
     expect(created.status).toBe('Assigned');
     expect(created.subject).toBe('Test');
-    expect(created.assignedToName).toBe('Mark Reyes'); // covers Unisan Branch (br-001)
+    expect(created.assignedToName).toBe('Mark Reyes'); // covers Gumaca (br-011)
     expect(state.ticketCounter).toBe(127);
   });
 
   it('auto-assigns to the IT specialist assigned to the requester branch', () => {
     const state = createState();
-    const requester = state.users.find((u) => u.id === 'usr-002')!; // Atimonan Branch
+    const requester = state.users.find((u) => u.id === 'usr-002')!; // Atimonan
     const next = createTicket(state, {
       subject: 'Test',
       description: 'Desc',
@@ -46,7 +46,7 @@ describe('createTicket', () => {
     });
     const created = next.tickets[0];
     expect(created.status).toBe('Assigned');
-    expect(created.assignedToName).toBe('Mark Reyes'); // covers Atimonan Branch (br-002)
+    expect(created.assignedToName).toBe('Mark Reyes'); // covers Atimonan (br-003)
     expect(created.assignedToId).toBe('usr-003');
   });
 
@@ -63,7 +63,7 @@ describe('createTicket', () => {
     expect(next.tickets[0].assignedToId).toBeUndefined();
   });
 
-  it('notifies every IT specialist member and administrator, not just one', () => {
+  it('notifies only administrators and the assigned IT specialist, not every support member', () => {
     const state = createState();
     const next = createTicket(state, {
       subject: 'Test',
@@ -71,13 +71,17 @@ describe('createTicket', () => {
       category: 'Network' as const,
       currentUser: branchUser(),
     });
-    const supportUsers = next.users.filter((u) => u.role === 'IT_STAFF' || u.role === 'ADMINISTRATOR');
+    const assigned = next.tickets[0].assignedToId;
+    const admins = next.users.filter((u) => u.role === 'ADMINISTRATOR');
     const notifiedIds = next.notifications
       .filter((n) => n.ticketId === 'IT-000126')
       .map((n) => n.userId);
-    expect(notifiedIds).toHaveLength(supportUsers.length);
-    for (const u of supportUsers) {
+    expect(notifiedIds).toHaveLength(admins.length + (assigned ? 1 : 0));
+    for (const u of admins) {
       expect(notifiedIds).toContain(u.id);
+    }
+    for (const u of next.users.filter((u) => u.role === 'IT_STAFF')) {
+      if (u.id !== assigned) expect(notifiedIds).not.toContain(u.id);
     }
   });
 });
