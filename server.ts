@@ -115,11 +115,27 @@ const httpServer = createServer(app);
 app.use(csrfCookie);
 
 // Security headers via Helmet
+const isProd = process.env.NODE_ENV === "production";
 app.use(
   helmet({
-    contentSecurityPolicy: false, // Disable CSP for development flexibility
+    contentSecurityPolicy: isProd
+      ? {
+          directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'"],
+            styleSrc: ["'self'", "'unsafe-inline'"],
+            imgSrc: ["'self'", "data:", "blob:"],
+            fontSrc: ["'self'"],
+            connectSrc: ["'self'"],
+            frameSrc: ["'none'"],
+            objectSrc: ["'none'"],
+            baseUri: ["'self'"],
+            formAction: ["'self'"],
+          },
+        }
+      : false,
     crossOriginEmbedderPolicy: false,
-    hsts: process.env.NODE_ENV === "production", // Enable HSTS in production
+    hsts: isProd,
   }),
 );
 

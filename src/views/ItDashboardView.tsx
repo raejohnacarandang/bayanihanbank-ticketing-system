@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion } from 'motion/react';
 import { Ticket, User } from '../types';
 import { StatusBadge } from '../components/Badge';
 import {
@@ -80,7 +81,11 @@ export const ItDashboardView: React.FC<ItDashboardViewProps> = ({
 
       {/* Metric Cards Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        <div
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          whileHover={{ y: -2, transition: { type: "spring", stiffness: 300, damping: 20 } }}
+          transition={{ delay: 0.1, duration: 0.35 }}
           onClick={() => setStatusFilter('ALL')}
           className={`p-3.5 rounded-xl border transition cursor-pointer ${
             statusFilter === 'ALL'
@@ -93,9 +98,13 @@ export const ItDashboardView: React.FC<ItDashboardViewProps> = ({
             <TicketIcon className={`w-3.5 h-3.5 ${statusFilter === 'ALL' ? 'text-emerald-300' : 'text-slate-400'}`} />
           </div>
           <div className="text-2xl font-black mt-1">{totalCount}</div>
-        </div>
+        </motion.div>
 
-        <div
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          whileHover={{ y: -2, transition: { type: "spring", stiffness: 300, damping: 20 } }}
+          transition={{ delay: 0.15, duration: 0.35 }}
           onClick={() => setStatusFilter('Assigned')}
           className={`p-3.5 rounded-xl border transition cursor-pointer ${
             statusFilter === 'Assigned'
@@ -110,9 +119,13 @@ export const ItDashboardView: React.FC<ItDashboardViewProps> = ({
             <UserCheck className={`w-3.5 h-3.5 ${statusFilter === 'Assigned' ? 'text-indigo-300' : 'text-indigo-600'}`} />
           </div>
           <div className={`text-2xl font-black mt-1 ${statusFilter === 'Assigned' ? 'text-indigo-50' : 'text-indigo-900'}`}>{assignedCount}</div>
-        </div>
+        </motion.div>
 
-        <div
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          whileHover={{ y: -2, transition: { type: "spring", stiffness: 300, damping: 20 } }}
+          transition={{ delay: 0.2, duration: 0.35 }}
           onClick={() => setStatusFilter('In Progress')}
           className={`p-3.5 rounded-xl border transition cursor-pointer ${
             statusFilter === 'In Progress'
@@ -127,9 +140,13 @@ export const ItDashboardView: React.FC<ItDashboardViewProps> = ({
             <PlayCircle className={`w-3.5 h-3.5 ${statusFilter === 'In Progress' ? 'text-amber-300' : 'text-amber-600'}`} />
           </div>
           <div className={`text-2xl font-black mt-1 ${statusFilter === 'In Progress' ? 'text-amber-50' : 'text-amber-900'}`}>{inProgressCount}</div>
-        </div>
+        </motion.div>
 
-        <div
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          whileHover={{ y: -2, transition: { type: "spring", stiffness: 300, damping: 20 } }}
+          transition={{ delay: 0.25, duration: 0.35 }}
           onClick={() => setStatusFilter('Pending')}
           className={`p-3.5 rounded-xl border transition cursor-pointer ${
             statusFilter === 'Pending'
@@ -144,9 +161,13 @@ export const ItDashboardView: React.FC<ItDashboardViewProps> = ({
             <Clock className={`w-3.5 h-3.5 ${statusFilter === 'Pending' ? 'text-purple-300' : 'text-purple-600'}`} />
           </div>
           <div className={`text-2xl font-black mt-1 ${statusFilter === 'Pending' ? 'text-purple-50' : 'text-purple-900'}`}>{pendingCount}</div>
-        </div>
+        </motion.div>
 
-        <div
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          whileHover={{ y: -2, transition: { type: "spring", stiffness: 300, damping: 20 } }}
+          transition={{ delay: 0.3, duration: 0.35 }}
           onClick={() => setStatusFilter('Resolved')}
           className={`p-3.5 rounded-xl border transition cursor-pointer ${
             statusFilter === 'Resolved'
@@ -161,7 +182,7 @@ export const ItDashboardView: React.FC<ItDashboardViewProps> = ({
             <CheckCircle2 className={`w-3.5 h-3.5 ${statusFilter === 'Resolved' ? 'text-emerald-300' : 'text-emerald-600'}`} />
           </div>
           <div className={`text-2xl font-black mt-1 ${statusFilter === 'Resolved' ? 'text-emerald-50' : 'text-emerald-900'}`}>{resolvedCount}</div>
-        </div>
+        </motion.div>
       </div>
 
       {/* Tickets Requiring IT Attention */}
@@ -283,9 +304,12 @@ export const ItDashboardView: React.FC<ItDashboardViewProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {attentionTickets.map((ticket) => (
-                  <tr
+                {attentionTickets.map((ticket, i) => (
+                  <motion.tr
                     key={ticket.id}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 + i * 0.03, duration: 0.25 }}
                     onClick={() => onNavigateTicketDetail(ticket.id)}
                     className="hover:bg-emerald-50/40 transition cursor-pointer group"
                   >
@@ -325,7 +349,7 @@ export const ItDashboardView: React.FC<ItDashboardViewProps> = ({
                         <span>Manage</span>
                       </button>
                     </td>
-                  </tr>
+                  </motion.tr>
                 ))}
               </tbody>
             </table>

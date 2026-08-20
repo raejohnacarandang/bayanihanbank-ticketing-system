@@ -7,7 +7,7 @@
     "dev": "concurrently -k -n api,web -c blue,green \"tsx server.ts\" \"vite --port=3000 --host=0.0.0.0\"",
     "dev:web": "vite --port=3000 --host=0.0.0.0",
     "dev:server": "tsx server.ts",
-    "build": "vite build",
+    "build": "vite build && npm run build:server",
     "build:server": "esbuild server.ts --bundle --platform=node --format=esm --packages=external --outfile=server.js",
     "start": "npm run build:server && node server.js",
     "preview": "vite preview",

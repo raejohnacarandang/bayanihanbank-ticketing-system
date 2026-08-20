@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import {
   Ticket,
   User,
@@ -7,6 +8,7 @@ import {
   TicketStatus
 } from '../types';
 import { StatusBadge } from '../components/Badge';
+import { Button } from '../components/ui/Button';
 import {
   ArrowLeft,
   CheckCircle2,
@@ -113,13 +115,15 @@ export const TicketDetailView: React.FC<TicketDetailViewProps> = ({
           <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-emerald-800">
             {isBranchUser && (
               <>
-                <button
+                <Button
                   onClick={() => onUpdateStatus(ticket.id, 'Closed', 'Branch confirmed resolution.')}
-                  className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs rounded-xl transition shadow-md flex items-center gap-1.5 cursor-pointer"
+                  variant="primary"
+                  size="lg"
+                  className="flex items-center gap-1.5"
                 >
                   <Check className="w-4 h-4" />
                   <span>Confirm Resolution (Close Ticket)</span>
-                </button>
+                </Button>
               </>
             )}
 
@@ -401,13 +405,15 @@ export const TicketDetailView: React.FC<TicketDetailViewProps> = ({
                     </span>
                   )}
 
-                  <button
+                  <Button
                     type="submit"
-                    className="px-5 py-2 bg-emerald-900 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl transition shadow-sm flex items-center gap-1.5 ml-auto cursor-pointer"
+                    variant="primary"
+                    size="sm"
+                    className="flex items-center gap-1.5 ml-auto"
                   >
                     <Send className="w-3.5 h-3.5" />
                     <span>Post Comment</span>
-                  </button>
+                  </Button>
                 </div>
               </form>
             )}
@@ -426,8 +432,14 @@ export const TicketDetailView: React.FC<TicketDetailViewProps> = ({
             </div>
 
             <div className="relative pl-6 space-y-4 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
-              {timeline.map((event) => (
-                <div key={event.id} className="relative text-xs">
+              {timeline.map((event, i) => (
+                <motion.div
+                  key={event.id}
+                  initial={{ opacity: 0, x: -8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.2 + i * 0.05, duration: 0.25 }}
+                  className="relative text-xs"
+                >
                   {/* Timeline Dot Indicator */}
                   <div className="absolute -left-6 top-0.5 w-3 h-3 rounded-full bg-emerald-600 border-2 border-white shadow-xs" />
 
@@ -440,7 +452,7 @@ export const TicketDetailView: React.FC<TicketDetailViewProps> = ({
                       {event.details}
                     </div>
                   )}
-                </div>
+                </motion.div>
               ))}
             </div>
           </div>
@@ -448,9 +460,24 @@ export const TicketDetailView: React.FC<TicketDetailViewProps> = ({
       </div>
 
       {/* RESOLUTION RECORD MODAL FOR IT STAFF */}
+      <AnimatePresence>
       {showResolveModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs p-4 flex overflow-y-auto">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 m-auto shadow-2xl border border-slate-200 space-y-4">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.15 }}
+          className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs p-4 flex overflow-y-auto"
+          onClick={() => setShowResolveModal(false)}
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 8 }}
+            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl max-w-md w-full p-6 m-auto shadow-2xl border border-slate-200 space-y-4"
+          >
             <div className="flex items-center gap-2 text-emerald-900 font-bold text-base">
               <CheckCircle2 className="w-5 h-5 text-emerald-600" />
               <span>Record IT Resolution Notes</span>
@@ -483,17 +510,18 @@ export const TicketDetailView: React.FC<TicketDetailViewProps> = ({
                 >
                   Cancel
                 </button>
-                <button
+                <Button
                   type="submit"
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg transition shadow-md"
+                  variant="primary"
                 >
                   Mark as Resolved
-                </button>
+                </Button>
               </div>
             </form>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       )}
+      </AnimatePresence>
     </div>
   );
 };

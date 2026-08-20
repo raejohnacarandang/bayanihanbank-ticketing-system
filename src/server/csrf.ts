@@ -1,7 +1,17 @@
 import { Request, Response, NextFunction } from 'express';
 import { randomBytes, createHmac, timingSafeEqual } from 'crypto';
 
-const CSRF_SECRET = process.env.CSRF_SECRET || 'bayanihan-csrf-secret-change-in-production';
+function csrfSecret(): string {
+  const secret = process.env.CSRF_SECRET;
+  if (secret) return secret;
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'CSRF_SECRET environment variable is required in production. ' +
+        'Set a long random string (>= 32 chars) before starting the server.',
+    );
+  }
+  return randomBytes(48).toString('base64url');
+}
 const CSRF_COOKIE_NAME = 'csrf_token';
 const CSRF_HEADER_NAME = 'x-csrf-token';
 
@@ -10,7 +20,7 @@ function generateCsrfToken(): string {
 }
 
 function signToken(token: string): string {
-  return createHmac('sha256', CSRF_SECRET).update(token).digest('base64url');
+  return createHmac('sha256', csrfSecret()).update(token).digest('base64url');
 }
 
 function verifyToken(token: string, signature: string): boolean {

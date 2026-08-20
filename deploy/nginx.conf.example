@@ -27,8 +27,8 @@ server {
     listen 443 ssl http2;
     server_name servicedesk.bayanihanbank.ph;
 
-    ssl_certificate     /etc/letsencrypt/live/servicedesk.bayanihanbank.ph/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/servicedesk.bayanihanbank.ph/privkey.pem;
+    ssl_certificate     /etc/nginx/ssl/dev-cert.pem;
+    ssl_certificate_key /etc/nginx/ssl/dev-key.pem;
     ssl_protocols       TLSv1.2 TLSv1.3;
 
     # Force HTTPS for a year (trust proxy on the app trusts loopback, so real

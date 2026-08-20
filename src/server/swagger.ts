@@ -17,7 +17,9 @@ const options: swaggerJSDoc.Options = {
     },
     servers: [
       {
-        url: "http://localhost:3001/api",
+        url: process.env.APP_URL
+          ? `${process.env.APP_URL}/api`
+          : "http://localhost:3001/api",
         description: "Development server",
       },
     ],
@@ -1013,6 +1015,11 @@ const options: swaggerJSDoc.Options = {
 const swaggerSpec = swaggerJSDoc(options);
 
 export function setupSwagger(app: Application): void {
+  // Only serve Swagger UI in development mode
+  if (process.env.NODE_ENV === "production") {
+    return;
+  }
+
   app.use(
     "/api-docs",
     swaggerUi.serve,

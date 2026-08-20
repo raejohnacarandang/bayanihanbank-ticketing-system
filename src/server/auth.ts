@@ -12,15 +12,25 @@ import {
 } from "crypto";
 import { AppState, User, UserRole } from "../types";
 
-const JWT_SECRET_FALLBACK = "bayanihan-bank-demo-secret-change-me";
 /**
  * Resolved lazily (not at module load) because `dotenv.config()` runs in the
  * mysql/server modules AFTER this module is imported/evaluated in the ESM
  * bundle — a top-level `process.env.JWT_SECRET` const would always capture the
  * fallback. Reading it per-call guarantees `.env` values take effect.
+ *
+ * In production, JWT_SECRET MUST be set. In development, a per-process random
+ * fallback is used so the app still works without manual .env configuration.
  */
 function jwtSecret(): string {
-  return process.env.JWT_SECRET || JWT_SECRET_FALLBACK;
+  const secret = process.env.JWT_SECRET;
+  if (secret) return secret;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "JWT_SECRET environment variable is required in production. " +
+        "Set a long random string (>= 32 chars) before starting the server.",
+    );
+  }
+  return randomBytes(48).toString("base64url");
 }
 const TOKEN_TTL_MS = 1000 * 60 * 60 * 12; // 12 hours
 const DEMO_PASSWORD = "password123";

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import { User, NotificationItem, UserRole } from '../types';
 import { BayanihanLogo } from './BayanihanLogo';
 import {
@@ -120,8 +121,15 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
 
             {/* Role Switcher Dropdown */}
+            <AnimatePresence>
             {showRoleSwitcher && (
-              <div className="absolute right-0 mt-2 w-72 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-[var(--shadow-pop)] border border-slate-200 text-slate-800 z-50 p-2 overflow-hidden">
+              <motion.div
+                initial={{ opacity: 0, y: -4, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+                className="absolute right-0 mt-2 w-72 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-[var(--shadow-pop)] border border-slate-200 text-slate-800 z-50 p-2 overflow-hidden"
+              >
                 <div className="px-3 py-2 bg-slate-50 rounded-lg mb-2 border border-slate-100">
                   <div className="text-xs font-bold text-slate-900 uppercase tracking-wider">
                     Demo Role Switcher
@@ -166,11 +174,10 @@ export const Header: React.FC<HeaderProps> = ({
                     );
                   })}
                 </div>
-              </div>
+              </motion.div>
             )}
+            </AnimatePresence>
           </div>
-
-          {/* Notifications Dropdown */}
           <div className="relative">
             <button
               onClick={() => {
@@ -192,8 +199,15 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
 
             {/* Notifications Menu */}
+            <AnimatePresence>
             {showNotifMenu && (
-              <div className="absolute right-0 mt-2 w-80 sm:w-96 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-[var(--shadow-pop)] border border-slate-200 text-slate-800 z-50 overflow-hidden">
+              <motion.div
+                initial={{ opacity: 0, y: -4, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+                className="absolute right-0 mt-2 w-80 sm:w-96 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-[var(--shadow-pop)] border border-slate-200 text-slate-800 z-50 overflow-hidden"
+              >
                 <div className="px-4 py-3 bg-emerald-950 text-white flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Bell className="w-4 h-4 text-amber-400" />
@@ -238,8 +252,9 @@ export const Header: React.FC<HeaderProps> = ({
                     ))
                   )}
                 </div>
-              </div>
+              </motion.div>
             )}
+            </AnimatePresence>
           </div>
 
           {/* User Menu */}
@@ -264,8 +279,15 @@ export const Header: React.FC<HeaderProps> = ({
               <ChevronDown className="w-4 h-4 text-slate-400 hidden sm:block" />
             </button>
 
+            <AnimatePresence>
             {showUserMenu && (
-              <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-[var(--shadow-pop)] border border-slate-200 text-slate-800 z-50 p-2 overflow-hidden">
+              <motion.div
+                initial={{ opacity: 0, y: -4, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+                className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-[var(--shadow-pop)] border border-slate-200 text-slate-800 z-50 p-2 overflow-hidden"
+              >
                 <div className="p-3 border-b border-slate-100 mb-1">
                   <div className="text-xs font-bold text-slate-900">{currentUser.name}</div>
                   <div className="text-[11px] text-slate-500">{currentUser.email}</div>
@@ -293,8 +315,9 @@ export const Header: React.FC<HeaderProps> = ({
                   <LogOut className="w-4 h-4" />
                   <span>Log Out (Demo)</span>
                 </button>
-              </div>
+              </motion.div>
             )}
+            </AnimatePresence>
           </div>
         </div>
       </div>

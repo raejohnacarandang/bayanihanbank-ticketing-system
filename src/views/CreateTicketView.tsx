@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
+import { motion } from 'motion/react';
 import { User, TicketCategory, CategoryInfo, Ticket } from '../types';
+import { Button } from '../components/ui/Button';
 import { ArrowLeft, CheckCircle2, AlertCircle, Send, Building } from 'lucide-react';
 
 interface CreateTicketViewProps {
@@ -113,12 +115,14 @@ export const CreateTicketView: React.FC<CreateTicketViewProps> = ({
           </div>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-            <button
+            <Button
               onClick={() => onNavigateTicketDetail(createdTicket.id)}
-              className="w-full sm:w-auto px-6 py-2.5 bg-emerald-900 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl transition shadow-md cursor-pointer"
+              variant="primary"
+              size="lg"
+              className="w-full sm:w-auto"
             >
               View Ticket Details
-            </button>
+            </Button>
             <button
               onClick={onNavigateBack}
               className="w-full sm:w-auto px-6 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl transition cursor-pointer"
@@ -129,7 +133,12 @@ export const CreateTicketView: React.FC<CreateTicketViewProps> = ({
         </div>
       ) : (
         /* Ticket Submission Form */
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35 }}
+          className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"
+        >
           <div className="p-6 border-b border-slate-200 bg-slate-900 text-white">
             <h2 className="text-xl font-bold tracking-tight">Create IT Service Request</h2>
             <p className="text-xs text-emerald-200 mt-1">
@@ -257,16 +266,18 @@ export const CreateTicketView: React.FC<CreateTicketViewProps> = ({
               >
                 Cancel
               </button>
-              <button
+              <Button
                 type="submit"
-                className="px-6 py-2.5 bg-emerald-900 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl transition shadow-md flex items-center gap-2 cursor-pointer"
+                variant="primary"
+                size="lg"
+                className="flex items-center gap-2"
               >
                 <Send className="w-4 h-4" />
                 <span>Submit IT Request</span>
-              </button>
+              </Button>
             </div>
           </form>
-        </div>
+        </motion.div>
       )}
     </div>
   );

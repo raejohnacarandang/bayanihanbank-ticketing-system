@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion } from 'motion/react';
 import { User } from '../types';
 import {
   User as UserIcon,
@@ -69,7 +70,12 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUser, onChangeP
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35 }}
+        className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"
+      >
         <div className="p-6 bg-slate-900 text-white flex items-center gap-4">
           <div className="w-16 h-16 rounded-full bg-emerald-600 text-white font-black text-2xl flex items-center justify-center border-2 border-emerald-400/40">
             {currentUser.name.charAt(0)}
@@ -128,10 +134,15 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUser, onChangeP
             </p>
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* Change Password */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, delay: 0.1 }}
+        className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"
+      >
         <div className="p-5 border-b border-slate-200 bg-slate-50/60 flex items-center gap-2">
           <Key className="w-4 h-4 text-emerald-700" />
           <h3 className="text-sm font-bold text-slate-900">Change Password</h3>
@@ -226,7 +237,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ currentUser, onChangeP
             </button>
           </div>
         </form>
-      </div>
+      </motion.div>
     </div>
   );
 };

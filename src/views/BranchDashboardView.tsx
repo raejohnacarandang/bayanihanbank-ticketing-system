@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion } from 'motion/react';
 import { Ticket, User, TicketStatus } from '../types';
 import { StatusBadge } from '../components/Badge';
 import { PlusCircle, Ticket as TicketIcon, CheckCircle2, PlayCircle, Eye, Search } from 'lucide-react';
@@ -86,7 +87,11 @@ export const BranchDashboardView: React.FC<BranchDashboardViewProps> = ({
 
       {/* Summary Metrics Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-        <div
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          whileHover={{ y: -2, transition: { type: "spring", stiffness: 300, damping: 20 } }}
+          transition={{ delay: 0.1, duration: 0.35 }}
           onClick={() => setSelectedStatusFilter('ALL')}
           className={`p-4 rounded-xl border transition cursor-pointer ${
             selectedStatusFilter === 'ALL'
@@ -102,9 +107,13 @@ export const BranchDashboardView: React.FC<BranchDashboardViewProps> = ({
           </div>
           <div className="text-2xl sm:text-3xl font-black mt-2">{totalCount}</div>
           <div className={`text-[11px] mt-1 ${selectedStatusFilter === 'ALL' ? 'text-slate-400' : 'text-slate-500'}`}>Submitted from branch</div>
-        </div>
+        </motion.div>
 
-        <div
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          whileHover={{ y: -2, transition: { type: "spring", stiffness: 300, damping: 20 } }}
+          transition={{ delay: 0.15, duration: 0.35 }}
           onClick={() => setSelectedStatusFilter('In Progress')}
           className={`p-4 rounded-xl border transition cursor-pointer ${
             selectedStatusFilter === 'In Progress'
@@ -122,9 +131,13 @@ export const BranchDashboardView: React.FC<BranchDashboardViewProps> = ({
             selectedStatusFilter === 'In Progress' ? 'text-amber-50' : 'text-amber-900'
           }`}>{inProgressCount}</div>
           <div className={`text-[11px] mt-1 ${selectedStatusFilter === 'In Progress' ? 'text-amber-200' : 'text-slate-500'}`}>Under IT resolution</div>
-        </div>
+        </motion.div>
 
-        <div
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          whileHover={{ y: -2, transition: { type: "spring", stiffness: 300, damping: 20 } }}
+          transition={{ delay: 0.2, duration: 0.35 }}
           onClick={() => setSelectedStatusFilter('Resolved')}
           className={`p-4 rounded-xl border transition cursor-pointer ${
             selectedStatusFilter === 'Resolved'
@@ -142,7 +155,7 @@ export const BranchDashboardView: React.FC<BranchDashboardViewProps> = ({
             selectedStatusFilter === 'Resolved' ? 'text-emerald-50' : 'text-emerald-900'
           }`}>{resolvedCount}</div>
           <div className={`text-[11px] mt-1 ${selectedStatusFilter === 'Resolved' ? 'text-emerald-200' : 'text-slate-500'}`}>Needs branch confirmation</div>
-        </div>
+        </motion.div>
       </div>
 
       {/* Recent Tickets Section */}
@@ -205,9 +218,12 @@ export const BranchDashboardView: React.FC<BranchDashboardViewProps> = ({
           <>
             {/* Mobile card list */}
             <div className="md:hidden divide-y divide-slate-100">
-              {filteredTickets.map((ticket) => (
-                <div
+              {filteredTickets.map((ticket, i) => (
+                <motion.div
                   key={ticket.id}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 + i * 0.03, duration: 0.25 }}
                   onClick={() => onNavigateTicketDetail(ticket.id)}
                   className="p-4 hover:bg-emerald-50/40 transition cursor-pointer group space-y-3"
                 >
@@ -240,7 +256,7 @@ export const BranchDashboardView: React.FC<BranchDashboardViewProps> = ({
                     <Eye className="w-3.5 h-3.5" />
                     <span>View Ticket</span>
                   </button>
-                </div>
+                </motion.div>
               ))}
             </div>
 
@@ -258,9 +274,12 @@ export const BranchDashboardView: React.FC<BranchDashboardViewProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredTickets.map((ticket) => (
-                  <tr
+                {filteredTickets.map((ticket, i) => (
+                  <motion.tr
                     key={ticket.id}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 + i * 0.03, duration: 0.25 }}
                     onClick={() => onNavigateTicketDetail(ticket.id)}
                     className="hover:bg-emerald-50/40 transition cursor-pointer group"
                   >
@@ -289,7 +308,7 @@ export const BranchDashboardView: React.FC<BranchDashboardViewProps> = ({
                         <span>View</span>
                       </button>
                     </td>
-                  </tr>
+                  </motion.tr>
                 ))}
               </tbody>
             </table>

@@ -1,4 +1,5 @@
 import React from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import { useLocation } from 'react-router-dom';
 import { User, ActiveView } from '../types';
 import { parsePath } from '../routes';
@@ -72,12 +73,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <>
       {/* Mobile Backdrop Overlay */}
+      <AnimatePresence>
       {isOpen && (
-        <div
+        <motion.div
           onClick={onCloseMobile}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.15 }}
           className="fixed inset-0 z-20 bg-slate-900/50 backdrop-blur-xs md:hidden"
         />
       )}
+      </AnimatePresence>
 
       {/* Sidebar Container */}
       <aside

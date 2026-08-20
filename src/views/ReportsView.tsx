@@ -1,4 +1,5 @@
 import React from 'react';
+import { motion } from 'motion/react';
 import { Ticket, TicketStatus, Branch, User } from '../types';
 import {
   BarChart3,
@@ -75,9 +76,11 @@ function Bar({ value, max, className, label }: { value: number; max: number; cla
   const width = max > 0 ? Math.max(2, Math.round((value / max) * 100)) : 0;
   return (
     <div className="h-2.5 rounded-full bg-slate-100 overflow-hidden">
-      <div
+      <motion.div
         className={`h-full rounded-full ${className}`}
-        style={{ width: `${width}%` }}
+        initial={{ width: 0 }}
+        animate={{ width: `${width}%` }}
+        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
         title={label}
       />
     </div>

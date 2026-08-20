@@ -1,5 +1,7 @@
 import React, { useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import { BayanihanLogo } from "../components/BayanihanLogo";
+import { Button } from "../components/ui/Button";
 import {
   ShieldCheck,
   Lock,
@@ -192,7 +194,12 @@ export const LoginView: React.FC<LoginViewProps> = ({
       {/* Main Login Card Container */}
       <div className="my-auto max-w-md mx-auto w-full space-y-6 pt-6 pb-8">
         {/* Bank Brand Identity Header */}
-        <div className="text-center space-y-3">
+        <motion.div
+          initial={{ opacity: 0, y: -12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+          className="text-center space-y-3"
+        >
           <div className="flex justify-center">
             <BayanihanLogo
               size="xl"
@@ -203,10 +210,15 @@ export const LoginView: React.FC<LoginViewProps> = ({
           <p className="text-xs text-emerald-200/80 max-w-xs mx-auto leading-relaxed">
             Centralized IT Support & Service Management for Branches and Main IT
           </p>
-        </div>
+        </motion.div>
 
         {/* Login Form Card */}
-        <div className="bg-white text-slate-900 rounded-2xl shadow-[var(--shadow-pop)] p-6 sm:p-8 border border-slate-200 animate-fade-up">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
+          className="bg-white text-slate-900 rounded-2xl shadow-[var(--shadow-pop)] p-6 sm:p-8 border border-slate-200"
+        >
           {savedAccounts.length > 0 && (
             <div className="mb-4 space-y-2">
               <div className="flex items-center justify-between">
@@ -334,21 +346,38 @@ export const LoginView: React.FC<LoginViewProps> = ({
               </button>
             </div>
 
-            <button
+            <Button
               type="submit"
-              className="w-full py-3 bg-gradient-to-r from-emerald-950 to-emerald-800 hover:from-emerald-900 hover:to-emerald-700 text-amber-300 font-extrabold text-sm rounded-xl transition shadow-lg hover:shadow-xl active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer border border-emerald-700"
+              variant="primary"
+              size="lg"
+              className="w-full justify-center"
             >
               <span>Access IT Portal</span>
-              <ArrowRight className="w-4 h-4 text-amber-400" />
-            </button>
+              <ArrowRight className="w-4 h-4" />
+            </Button>
           </form>
-        </div>
+        </motion.div>
       </div>
 
       {/* Forgot Password Modal */}
+      <AnimatePresence>
       {showForgotModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs p-4 flex overflow-y-auto">
-          <div className="bg-white text-slate-900 rounded-xl max-w-sm w-full p-6 m-auto space-y-4 shadow-2xl border border-slate-200">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.15 }}
+          className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs p-4 flex overflow-y-auto"
+          onClick={closeForgotModal}
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 8 }}
+            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white text-slate-900 rounded-2xl max-w-sm w-full p-6 m-auto space-y-4 shadow-2xl border border-slate-200"
+          >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-emerald-900 font-bold text-base">
                 <ShieldCheck className="w-5 h-5 text-emerald-600" />
@@ -430,17 +459,18 @@ export const LoginView: React.FC<LoginViewProps> = ({
                   >
                     Back
                   </button>
-                  <button
+                  <Button
                     type="submit"
+                    variant="primary"
                     disabled={
                       !recoveryKey.trim() || resetStatus === "submitting"
                     }
-                    className="flex-1 py-2 bg-emerald-950 text-white font-semibold text-xs rounded-lg hover:bg-emerald-900 transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                    className="flex-1"
                   >
                     {resetStatus === "submitting"
                       ? "Resetting…"
                       : "Reset Password"}
-                  </button>
+                  </Button>
                 </div>
               </form>
             ) : (
@@ -467,22 +497,24 @@ export const LoginView: React.FC<LoginViewProps> = ({
                     <span>{resetMessage}</span>
                   </div>
                 )}
-                <button
+                <Button
                   type="submit"
+                  variant="primary"
                   disabled={
                     !resetUsername.trim() || resetStatus === "submitting"
                   }
-                  className="w-full py-2 bg-emerald-950 text-white font-semibold text-xs rounded-lg hover:bg-emerald-900 transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                  className="w-full"
                 >
                   {resetStatus === "submitting"
                     ? "Submitting…"
                     : "Submit Reset Request"}
-                </button>
+                </Button>
               </form>
             )}
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       )}
+      </AnimatePresence>
 
       {/* Footer Disclaimer */}
       <footer className="text-center text-emerald-300/70 text-[11px] py-4 border-t border-emerald-900/80">

@@ -1,4 +1,5 @@
 import React from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import { X, CheckCircle, ArrowRight, Play, UserCheck, ShieldCheck, HelpCircle } from 'lucide-react';
 import { UserRole } from '../types';
 
@@ -15,8 +16,6 @@ export const GuidedDemoModal: React.FC<GuidedDemoModalProps> = ({
   onQuickSwitchRole,
   onNavigateView,
 }) => {
-  if (!isOpen) return null;
-
   const steps = [
     {
       num: 1,
@@ -85,83 +84,104 @@ export const GuidedDemoModal: React.FC<GuidedDemoModalProps> = ({
   ];
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs p-4 flex overflow-y-auto">
-      <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] m-auto flex flex-col border border-slate-200 overflow-hidden">
-        {/* Header */}
-        <div className="bg-emerald-950 text-white px-6 py-4 flex items-center justify-between border-b border-emerald-800">
-          <div className="flex items-center gap-2">
-            <Play className="w-5 h-5 text-emerald-400 fill-emerald-400" />
-            <div>
-              <h2 className="text-lg font-bold">Interactive Demo Walkthrough Guide</h2>
-              <p className="text-xs text-emerald-200">
-                End-to-End IT Service Desk Ticket Lifecycle Simulation
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-emerald-900 transition"
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs p-4 flex overflow-y-auto"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.15 }}
+          onClick={onClose}
+        >
+          <motion.div
+            className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] m-auto flex flex-col border border-slate-200 overflow-hidden"
+            initial={{ opacity: 0, scale: 0.95, y: 8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 8 }}
+            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            onClick={(e) => e.stopPropagation()}
           >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Body */}
-        <div className="p-6 overflow-y-auto space-y-4">
-          <p className="text-xs text-slate-600 bg-emerald-50 border border-emerald-200 p-3 rounded-lg leading-relaxed">
-            This guided walkthrough demonstrates the complete <strong>Branch User → Main IT → Resolution → Branch Confirmation</strong> workflow required for presentation to the IT supervisor.
-          </p>
-
-          <div className="space-y-3">
-            {steps.map((step) => (
-              <div
-                key={step.num}
-                className="p-3.5 bg-slate-50 rounded-lg border border-slate-200 hover:border-emerald-300 transition flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
-              >
-                <div className="flex items-start gap-3">
-                  <span className="w-7 h-7 rounded-full bg-emerald-900 text-white font-bold text-xs flex items-center justify-center shrink-0">
-                    {step.num}
-                  </span>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h4 className="font-semibold text-slate-900 text-sm">{step.title}</h4>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded font-mono bg-slate-200 text-slate-700">
-                        {step.roleNeeded}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-600 mt-0.5">{step.description}</p>
-                  </div>
+            {/* Header */}
+            <div className="bg-emerald-950 text-white px-6 py-4 flex items-center justify-between border-b border-emerald-800">
+              <div className="flex items-center gap-2">
+                <Play className="w-5 h-5 text-emerald-400 fill-emerald-400" />
+                <div>
+                  <h2 className="text-lg font-bold">Interactive Demo Walkthrough Guide</h2>
+                  <p className="text-xs text-emerald-200">
+                    End-to-End IT Service Desk Ticket Lifecycle Simulation
+                  </p>
                 </div>
-
-                <button
-                  onClick={() => {
-                    onQuickSwitchRole(step.roleNeeded);
-                    onNavigateView(step.actionView);
-                    onClose();
-                  }}
-                  className="shrink-0 px-3 py-1.5 bg-emerald-900 hover:bg-emerald-800 text-white text-xs font-medium rounded-md transition flex items-center gap-1 self-end sm:self-center"
-                >
-                  <span>{step.actionText}</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
               </div>
-            ))}
-          </div>
-        </div>
+              <button
+                onClick={onClose}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-emerald-900 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
-        {/* Footer */}
-        <div className="bg-slate-50 border-t border-slate-200 px-6 py-3 flex justify-between items-center">
-          <span className="text-xs text-slate-500 italic">
-            You can also switch roles anytime via topbar menu.
-          </span>
-          <button
-            onClick={onClose}
-            className="px-4 py-1.5 bg-slate-800 text-white font-medium text-xs rounded-md hover:bg-slate-700 transition"
-          >
-            Close Guide
-          </button>
-        </div>
-      </div>
-    </div>
+            {/* Body */}
+            <div className="p-6 overflow-y-auto space-y-4">
+              <p className="text-xs text-slate-600 bg-emerald-50 border border-emerald-200 p-3 rounded-lg leading-relaxed">
+                This guided walkthrough demonstrates the complete <strong>Branch User → Main IT → Resolution → Branch Confirmation</strong> workflow required for presentation to the IT supervisor.
+              </p>
+
+              <div className="space-y-3">
+                {steps.map((step, i) => (
+                  <motion.div
+                    key={step.num}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.05 + i * 0.03, duration: 0.25 }}
+                    className="p-3.5 bg-slate-50 rounded-lg border border-slate-200 hover:border-emerald-300 transition flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
+                  >
+                    <div className="flex items-start gap-3">
+                      <span className="w-7 h-7 rounded-full bg-emerald-900 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                        {step.num}
+                      </span>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-semibold text-slate-900 text-sm">{step.title}</h4>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded font-mono bg-slate-200 text-slate-700">
+                            {step.roleNeeded}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-600 mt-0.5">{step.description}</p>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        onQuickSwitchRole(step.roleNeeded);
+                        onNavigateView(step.actionView);
+                        onClose();
+                      }}
+                      className="shrink-0 px-3 py-1.5 bg-emerald-900 hover:bg-emerald-800 text-white text-xs font-medium rounded-md transition flex items-center gap-1 self-end sm:self-center"
+                    >
+                      <span>{step.actionText}</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="bg-slate-50 border-t border-slate-200 px-6 py-3 flex justify-between items-center">
+              <span className="text-xs text-slate-500 italic">
+                You can also switch roles anytime via topbar menu.
+              </span>
+              <button
+                onClick={onClose}
+                className="px-4 py-1.5 bg-slate-800 text-white font-medium text-xs rounded-md hover:bg-slate-700 transition"
+              >
+                Close Guide
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 };

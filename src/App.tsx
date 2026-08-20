@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { AnimatePresence, motion } from "motion/react";
 import {
   User,
   Ticket,
@@ -22,6 +23,7 @@ import {
   requestNotificationPermission,
 } from "./services/notify";
 import { NotificationToasts, ToastItem } from "./components/NotificationToasts";
+import { SkeletonCard, SkeletonTable } from "./components/ui/Skeleton";
 import type {
   CreateBranchParams,
   CreateCategoryParams,
@@ -53,6 +55,7 @@ export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() =>
     storage.hasSession(),
   );
+  const [isInitializing, setIsInitializing] = useState<boolean>(true);
   const [currentUser, setCurrentUser] = useState<User>(() =>
     storage.getCurrentUser(),
   );
@@ -156,6 +159,7 @@ export default function App() {
     let cancelled = false;
     storage.init().then((restored) => {
       if (cancelled) return;
+      setIsInitializing(false);
       if (restored) {
         refreshData();
         setCurrentUser(storage.getCurrentUser());
@@ -529,6 +533,32 @@ export default function App() {
     (u) => u.role === "IT_STAFF" || u.role === "ADMINISTRATOR",
   );
 
+  // Show skeleton loading screen while session is being restored
+  if (isInitializing) {
+    return (
+      <div className="min-h-screen bg-slate-100">
+        <div className="h-16 bg-white border-b border-slate-200" />
+        <div className="flex">
+          <div className="w-64 h-[calc(100vh-4rem)] bg-white border-r border-slate-200 p-4 hidden lg:block">
+            <div className="space-y-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="skeleton h-9 rounded-lg" />
+              ))}
+            </div>
+          </div>
+          <div className="flex-1 p-6 space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <SkeletonCard key={i} />
+              ))}
+            </div>
+            <SkeletonTable rows={5} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!isLoggedIn) {
     return (
       <LoginView
@@ -621,10 +651,15 @@ export default function App() {
         />
 
         {/* Main Content Viewport */}
-        <main
-          key={activeView}
-          className="flex-1 p-4 sm:p-6 lg:p-8 min-w-0 overflow-hidden animate-fade-in"
-        >
+        <AnimatePresence mode="wait">
+          <motion.main
+            key={activeView}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            className="flex-1 p-4 sm:p-6 lg:p-8 min-w-0 overflow-hidden"
+          >
           {/* DASHBOARD VIEW */}
           {activeView === "dashboard" && (
             <>
@@ -833,7 +868,8 @@ export default function App() {
               onChangePassword={handleChangePassword}
             />
           )}
-        </main>
+          </motion.main>
+        </AnimatePresence>
       </div>
 
       {/* Footer */}

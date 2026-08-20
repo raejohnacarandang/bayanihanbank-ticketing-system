@@ -1,4 +1,5 @@
 import React from 'react';
+import { motion } from 'motion/react';
 import { NotificationItem } from '../types';
 import { Bell, CheckCircle2, Ticket as TicketIcon, Clock, ExternalLink } from 'lucide-react';
 
@@ -15,7 +16,12 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
 }) => {
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
+      <motion.div
+        initial={{ opacity: 0, y: -8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        className="flex items-center justify-between"
+      >
         <div>
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
             <Bell className="w-6 h-6 text-emerald-600" />
@@ -29,7 +35,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
         <span className="text-xs font-mono font-bold text-slate-500">
           {notifications.length} alerts
         </span>
-      </div>
+      </motion.div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden divide-y divide-slate-100">
         {notifications.length === 0 ? (
@@ -37,9 +43,12 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
             No notifications available.
           </div>
         ) : (
-          notifications.map((n) => (
-            <div
+          notifications.map((n, i) => (
+            <motion.div
               key={n.id}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 + i * 0.03, duration: 0.25 }}
               onClick={() => {
                 onMarkRead(n.id);
                 onNavigateTicket(n.ticketId);
@@ -79,7 +88,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                 <span>View Ticket</span>
                 <ExternalLink className="w-3.5 h-3.5" />
               </button>
-            </div>
+            </motion.div>
           ))
         )}
       </div>

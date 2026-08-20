@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { motion } from 'motion/react';
 import { Ticket, User, TicketCategory, TicketStatus } from '../types';
 import { StatusBadge } from '../components/Badge';
 import { Search, Filter, X, Eye, Ticket as TicketIcon, PlusCircle, Building, UserCheck, Download, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -357,9 +358,12 @@ export const TicketListView: React.FC<TicketListViewProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {pageTickets.map((ticket) => (
-                  <tr
+                {pageTickets.map((ticket, i) => (
+                  <motion.tr
                     key={ticket.id}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.1 + i * 0.03, duration: 0.25 }}
                     onClick={() => onNavigateTicketDetail(ticket.id)}
                     className="hover:bg-emerald-50/40 transition cursor-pointer group"
                   >
@@ -408,7 +412,7 @@ export const TicketListView: React.FC<TicketListViewProps> = ({
                         <span>Manage</span>
                       </button>
                     </td>
-                  </tr>
+                  </motion.tr>
                 ))}
               </tbody>
             </table>
