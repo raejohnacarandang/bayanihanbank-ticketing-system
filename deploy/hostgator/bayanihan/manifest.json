@@ -1,0 +1,87 @@
+{
+  "name": "Bayanihan Bank IT Service Desk",
+  "short_name": "BayaniIT",
+  "description": "IT Service Desk for Bayanihan Bank - Submit and track IT tickets",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#15803d",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/icons/icon-72x72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-96x96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-128x128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-144x144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-152x152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-384x384.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "productivity"],
+  "shortcuts": [
+    {
+      "name": "New Ticket",
+      "short_name": "New Ticket",
+      "description": "Create a new IT ticket",
+      "url": "/tickets/new",
+      "icons": [{ "src": "/icons/ticket.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "My Tickets",
+      "short_name": "My Tickets",
+      "description": "View my tickets",
+      "url": "/my_tickets",
+      "icons": [{ "src": "/icons/tickets.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Branch Monitor",
+      "short_name": "Branch Monitor",
+      "description": "View branch system health",
+      "url": "/monitor",
+      "icons": [{ "src": "/icons/monitor.png", "sizes": "192x192" }]
+    }
+  ],
+  "prefer_related_applications": false,
+  "related_applications": []
+}
