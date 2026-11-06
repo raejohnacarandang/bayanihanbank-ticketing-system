@@ -1,0 +1,410 @@
+import React, { useEffect, useRef, useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import {
+  LayoutDashboard,
+  PlusCircle,
+  Ticket,
+  Bell,
+  User,
+  Building2,
+  Activity,
+  MessageSquare,
+  BookOpen,
+  ShieldCheck,
+  Settings,
+  ChevronDown,
+  ChevronUp,
+  Plus,
+  Menu,
+  X,
+  LogOut,
+  LayoutDashboard as LayoutDashboardIcon,
+  PlusCircle as PlusCircleIcon,
+  Ticket as TicketIcon2,
+  Bell as BellIcon2,
+  User as UserIcon3,
+  Building2 as Building2Icon2,
+  Activity as ActivityIcon2,
+  MessageSquare as MessageSquareIcon,
+  BookOpen as BookOpenIcon2,
+  ShieldCheck as ShieldCheckIcon,
+  Settings as SettingsIcon2,
+  LogOut as LogOutIcon,
+} from 'lucide-react';
+
+interface BottomNavItem {
+  id: string;
+  label: string;
+  icon: React.ReactNode;
+  activeIcon?: React.ReactNode;
+  href?: string;
+  onClick?: () => void;
+  badge?: number;
+  requiresAuth?: boolean;
+  roles?: string[];
+}
+
+interface BottomNavigationProps {
+  currentView: string;
+  currentUser: { role: string; branchName?: string };
+  onNavigate: (view: string) => void;
+  onOpenNotifications: () => void;
+  onCreateTicket: () => void;
+  onToggleSidebar: () => void;
+  unreadCount: number;
+  newTicketCount: number;
+  isSidebarOpen: boolean;
+}
+
+const NAV_ITEMS = [
+  {
+    id: 'dashboard',
+    label: 'Dashboard',
+    icon: <LayoutDashboardIcon className="w-6 h-6" />,
+    activeIcon: <LayoutDashboardIcon className="w-6 h-6" />,
+  },
+  {
+    id: 'tickets',
+    label: 'Tickets',
+    icon: <TicketIcon2 className="w-6 h-6" />,
+    activeIcon: <TicketIcon2 className="w-6 h-6 fill-current" />,
+  },
+  {
+    id: 'create',
+    label: 'New',
+    icon: <PlusCircleIcon className="w-6 h-6" />,
+    activeIcon: <PlusCircleIcon className="w-6 h-6 fill-current" />,
+    isFAB: true,
+  },
+  {
+    id: 'monitor',
+    label: 'Monitor',
+    icon: <ActivityIcon2 className="w-6 h-6" />,
+    activeIcon: <ActivityIcon2 className="w-6 h-6 fill-current" />,
+  },
+  {
+    id: 'more',
+    label: 'More',
+    icon: <Menu className="w-6 h-6" />,
+    activeIcon: <X className="w-6 h-6" />,
+    isMore: true,
+  },
+];
+
+interface BottomNavigationProps {
+  currentView: string;
+  currentUser: { role: string; branchName?: string };
+  onNavigate: (view: string) => void;
+  onOpenNotifications: () => void;
+  onCreateTicket: () => void;
+  onToggleSidebar: () => void;
+  unreadCount: number;
+  newTicketCount: number;
+  isSidebarOpen: boolean;
+}
+
+export function BottomNavigation({
+  currentView,
+  currentUser,
+  onNavigate,
+  onOpenNotifications,
+  onCreateTicket,
+  onToggleSidebar,
+  unreadCount,
+  newTicketCount,
+  isSidebarOpen,
+}: BottomNavigationProps) {
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [fabExpanded, setFabExpanded] = useState(false);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
+  const fabRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
+        setShowMoreMenu(false);
+      }
+      if (fabRef.current && !fabRef.current.contains(e.target as Node)) {
+        setFabExpanded(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleNavClick = (view: string) => {
+    onNavigate(view);
+    setShowMoreMenu(false);
+    setFabExpanded(false);
+  };
+
+  const moreItems = [
+    { 
+      id: 'notifications', 
+      label: 'Notifications', 
+      icon: <BellIcon2 className="w-5 h-5" />,
+      onClick: () => { onOpenNotifications(); setShowMoreMenu(false); },
+      badge: unreadCount,
+    },
+    { 
+      id: 'monitor', 
+      label: 'Branch Monitor', 
+      icon: <Activity className="w-5 h-5" />,
+      onClick: () => { handleNavClick('branch_monitor'); },
+    },
+    { 
+      id: 'messages', 
+      label: 'Messages', 
+      icon: <MessageSquareIcon className="w-5 h-5" />,
+      onClick: () => { handleNavClick('notifications'); },
+      badge: unreadCount,
+    },
+    { 
+      id: 'knowledge', 
+      label: 'Knowledge Base', 
+      icon: <BookOpenIcon2 className="w-5 h-5" />,
+      onClick: () => { handleNavClick('knowledge_base'); },
+    },
+    { 
+      id: 'help', 
+      label: 'Help Center', 
+      icon: <ShieldCheck className="w-5 h-5" />,
+      onClick: () => { handleNavClick('help_center'); },
+    },
+    { 
+      id: 'profile', 
+      label: 'Profile', 
+      icon: <UserIcon3 className="w-5 h-5" />,
+      onClick: () => { handleNavClick('profile'); },
+    },
+    { 
+      id: 'settings', 
+      label: 'Settings', 
+      icon: <SettingsIcon2 className="w-5 h-5" />,
+      onClick: () => { handleNavClick('settings'); },
+    },
+    { 
+      id: 'logout', 
+      label: 'Log Out', 
+      icon: <LogOutIcon className="w-5 h-5" />,
+      onClick: () => { /* handled by parent */ },
+      destructive: true,
+    },
+  ];
+
+  return (
+    <>
+      {/* FAB Menu */}
+      <AnimatePresence>
+        {fabExpanded && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-40 bg-slate-900/30 backdrop-blur-sm md:hidden"
+            onClick={() => setFabExpanded(false)}
+          />
+        )}
+        {fabExpanded && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2 md:hidden"
+            onClick={() => setFabExpanded(false)}
+          >
+            <motion.button type="button"
+              initial={{ opacity: 0, scale: 0.5, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.5, y: 20 }}
+              transition={{ delay: 0.05, duration: 0.2 }}
+              onClick={() => { handleNavClick('new_request'); }}
+              className="w-52 h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl shadow-lg flex items-center justify-center gap-2"
+            >
+              <PlusCircleIcon className="w-5 h-5" />
+              <span>New Ticket</span>
+            </motion.button>
+            <motion.button type="button"
+              initial={{ opacity: 0, scale: 0.5, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.5, y: 20 }}
+              transition={{ delay: 0.1, duration: 0.2 }}
+              onClick={() => { handleNavClick('my_tickets'); }}
+              className="w-52 h-12 bg-sky-600 hover:bg-sky-700 text-white font-semibold rounded-xl shadow-lg flex items-center justify-center gap-2"
+            >
+              <TicketIcon2 className="w-5 h-5" />
+              <span>My Tickets</span>
+            </motion.button>
+            <motion.button type="button"
+              initial={{ opacity: 0, scale: 0.5, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.5, y: 20 }}
+              transition={{ delay: 0.15, duration: 0.2 }}
+              onClick={() => { handleNavClick('branch_monitor'); }}
+              className="w-52 h-12 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-xl shadow-lg flex items-center justify-center gap-2"
+            >
+              <ActivityIcon2 className="w-5 h-5" />
+              <span>Branch Monitor</span>
+            </motion.button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Bottom Navigation Bar */}
+      <motion.div
+        initial={{ opacity: 0, y: 100 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 100 }}
+        className="fixed bottom-0 left-0 right-0 z-40 md:hidden"
+      >
+        <div className="bg-white border-t border-slate-200 shadow-[0_-4px_20px_-4px_rgba(0,0,0,0.1)]">
+          <div className="grid grid-cols-5 h-16">
+            {NAV_ITEMS.slice(0, 2).map((item, index) => (
+              <motion.button type="button"
+                key={item.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05, duration: 0.3 }}
+                onClick={() => handleNavClick(item.id)}
+                className={`relative flex flex-col items-center justify-center gap-1 px-2 py-2 ${
+                  currentView === item.id 
+                    ? 'text-emerald-600' 
+                    : 'text-slate-500'
+                }`}
+              >
+                <span className="relative flex items-center justify-center">
+                  {currentView === item.id ? item.activeIcon : item.icon}
+                  {item.badge && item.badge > 0 && (
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                      {item.badge > 9 ? '9+' : item.badge}
+                    </span>
+                  )}
+                </span>
+                <span className="text-[10px] font-medium mt-0.5">
+                  {item.label}
+                </span>
+              </motion.button>
+            ))}
+            
+            {/* FAB Button */}
+            <motion.button type="button"
+              ref={fabRef}
+              onClick={() => setFabExpanded(!fabExpanded)}
+              className="relative flex flex-col items-center justify-center z-10"
+              style={{ zIndex: 10 }}
+            >
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                exit={{ scale: 0 }}
+                className="w-14 h-14 rounded-full bg-emerald-600 shadow-[0_4px_20px_-4px_rgba(16,185,129,0.5)] flex items-center justify-center"
+              >
+                <motion.span
+                  animate={{ rotate: fabExpanded ? 45 : 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="text-white"
+                >
+                  <Plus className="w-7 h-7" />
+                </motion.span>
+              </motion.div>
+              <span className="text-[10px] font-medium text-slate-500 mt-1">New</span>
+            </motion.button>
+            
+            {NAV_ITEMS.slice(3, 4).map((item, index) => (
+              <motion.button type="button"
+                key={item.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: (index + 2) * 0.05, duration: 0.3 }}
+                onClick={() => handleNavClick(item.id)}
+                className={`relative flex flex-col items-center justify-center gap-1 px-2 py-2 ${
+                  currentView === item.id 
+                    ? 'text-emerald-600' 
+                    : 'text-slate-500'
+                }`}
+              >
+                <span className="relative flex items-center justify-center">
+                  {currentView === item.id ? item.activeIcon : item.icon}
+                  {item.badge && item.badge > 0 && (
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                      {item.badge > 9 ? '9+' : item.badge}
+                    </span>
+                  )}
+                </span>
+                <span className="text-[10px] font-medium mt-0.5">
+                  {item.label}
+                </span>
+              </motion.button>
+            ))}
+
+            {/* More Button */}
+            <motion.button type="button"
+              ref={moreMenuRef}
+              onClick={() => setShowMoreMenu(!showMoreMenu)}
+              className={`relative flex flex-col items-center justify-center gap-1 px-2 py-2 ${
+                showMoreMenu ? 'text-emerald-600' : 'text-slate-500'
+              }`}
+            >
+              <span className="relative flex items-center justify-center">
+                {showMoreMenu ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              </span>
+              <span className="text-[10px] font-medium mt-0.5">More</span>
+            </motion.button>
+          </div>
+        </div>
+
+        {/* More Menu Dropdown */}
+        <AnimatePresence>
+          {showMoreMenu && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="fixed bottom-16 left-0 right-0 z-50 px-4 pb-4 md:hidden"
+            >
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                className="bg-white rounded-2xl shadow-[0_-4px_20px_-4px_rgba(0,0,0,0.15)] border border-slate-200 p-3"
+              >
+                <div className="px-3 py-2 border-b border-slate-100 flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">More Options</span>
+                  <button type="button"
+                    onClick={() => setShowMoreMenu(false)}
+                    className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="py-2 space-y-1 max-h-64 overflow-y-auto">
+                  {moreItems.map((item) => (
+                    <button type="button"
+                      key={item.id}
+                      onClick={item.onClick}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition ${
+                        item.destructive 
+                          ? 'text-red-600 hover:bg-red-50' 
+                          : 'text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 flex-shrink-0">
+                        {item.icon}
+                      </span>
+                      <span className="font-medium text-slate-700 flex-1">{item.label}</span>
+                      {item.badge && item.badge > 0 && (
+                        <span className="px-2 py-0.5 text-[10px] font-bold bg-red-500 text-white rounded-full">
+                          {item.badge > 9 ? '9+' : item.badge}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </motion.div>
+            </motion.div>
+            )}
+          </AnimatePresence>
+      </motion.div>
+    </>
+  );
+}

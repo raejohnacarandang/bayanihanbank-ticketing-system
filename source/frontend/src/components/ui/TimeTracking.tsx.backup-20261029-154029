@@ -1,0 +1,572 @@
+﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { useFeatureFlag } from '../../hooks/useFeatureFlags';
+import { 
+  Play, 
+  Pause, 
+  Square,
+  Clock, 
+  Flag, 
+  Trash2, 
+  Edit, 
+  Plus,
+  ChevronDown,
+  ChevronUp,
+  History,
+  AlertTriangle,
+  CheckCircle2,
+  Zap,
+  X,
+  Calendar,
+} from 'lucide-react';
+import { Button, Input } from './MicroInteractions';
+
+interface TimeEntry {
+  id: string;
+  ticketId: string;
+  userId: string;
+  startTime: string;
+  endTime?: string;
+  duration: number; // in seconds
+  description?: string;
+  isRunning: boolean;
+}
+
+interface SLAConfig {
+  Critical: number; // 4 hours
+  High: number;     // 8 hours
+  Medium: number;   // 24 hours
+  Low: number;      // 48 hours
+}
+
+const SLA_CONFIG: SLAConfig = {
+  Critical: 4 * 60 * 60,    // 4 hours
+  High: 8 * 60 * 60,        // 8 hours
+  Medium: 24 * 60 * 60,     // 24 hours
+  Low: 48 * 60 * 60,        // 48 hours
+};
+
+interface TimeTrackingProps {
+  ticket: any;
+  currentUser: { id: string; name: string };
+  timeEntries: TimeEntry[];
+  onStartTimer: (ticketId: string, description?: string) => void;
+  onStopTimer: (entryId: string) => void;
+  onAddManualEntry: (ticketId: string, entry: Omit<TimeEntry, 'id' | 'userId' | 'isRunning'>) => void;
+  onUpdateEntry: (entryId: string, updates: Partial<TimeEntry>) => void;
+  onDeleteEntry: (entryId: string) => void;
+  slaConfig?: Partial<SLAConfig>;
+}
+
+interface TimerDisplayProps {
+  seconds: number;
+  isRunning: boolean;
+  isOverSLA: boolean;
+  showMilliseconds?: boolean;
+}
+
+function TimerDisplay({ seconds, isRunning, isOverSLA, showMilliseconds = false }: TimerDisplayProps) {
+  const [displayTime, setDisplayTime] = React.useState(seconds);
+  
+  useEffect(() => {
+    setDisplayTime(seconds);
+  }, [seconds]);
+
+  useEffect(() => {
+    if (!isRunning) return;
+    const interval = setInterval(() => {
+      setDisplayTime(prev => prev + 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isRunning]);
+
+  const hours = Math.floor(displayTime / 3600);
+  const minutes = Math.floor((displayTime % 3600) / 60);
+  const secs = displayTime % 60;
+
+  return (
+    <div className="flex items-baseline gap-1 font-mono font-bold text-lg">
+      <span className="text-slate-900">{hours.toString().padStart(2, '0')}</span>
+      <span className="text-slate-500">:</span>
+      <span className="text-slate-900">{minutes.toString().padStart(2, '0')}</span>
+      <span className="text-slate-500">:</span>
+      <span className={`text-slate-900 ${!showMilliseconds ? 'opacity-50' : ''}`}>{secs.toString().padStart(2, '0')}</span>
+    </div>
+  );
+}
+
+const formatDuration = (seconds: number) => {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  return `${h}h ${m}m ${s}s`;
+};
+const formatSLA = (seconds: number) => {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  return `${h}h ${m}m`;
+};
+export function TimeTracker({
+  ticket,
+  currentUser,
+  timeEntries,
+  onStartTimer,
+  onStopTimer,
+  onAddManualEntry,
+  onUpdateEntry,
+  onDeleteEntry,
+  slaConfig,
+}: TimeTrackingProps) {
+  const enabled = useFeatureFlag('time-tracking');
+  const [showManualEntry, setShowManualEntry] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<string | null>(null);
+  const [editDescription, setEditDescription] = useState('');
+  const [manualDescription, setManualDescription] = useState('');
+  const [manualDuration, setManualDuration] = useState(0);
+  const [manualDate, setManualDate] = useState(new Date().toISOString().split('T')[0]);
+
+  if (!enabled) return null;
+
+  const slaConfigFinal = { ...SLA_CONFIG, ...slaConfig };
+  const userEntries = timeEntries.filter(e => e.userId === currentUser.id);
+  const runningEntry = userEntries.find(e => e.isRunning);
+  const totalTime = userEntries.reduce((sum, e) => sum + e.duration, 0);
+  
+  const slaLimit = ticket.priority ? SLA_CONFIG[ticket.priority as keyof SLAConfig] : 24 * 60 * 60;
+  const isOverSLA = totalTime > slaLimit;
+  const slaRemaining = Math.max(0, slaLimit - totalTime);
+  const slaProgress = Math.min(100, (totalTime / slaLimit) * 100);
+
+
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      {/* Header */}
+      <div className="p-4 sm:p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-sky-100 flex items-center justify-center">
+            <Clock className="w-5 h-5 text-sky-600" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-slate-900">Time Tracking</h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {userEntries.length} entr{userEntries.length !== 1 ? 'ies' : 'y'} Ã‚Â· {formatDuration(totalTime)} total
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Button 
+            variant={runningEntry ? 'secondary' : 'primary'} 
+            size="sm"
+            onClick={runningEntry ? () => onStopTimer(runningEntry.id) : () => setShowManualEntry(true)}
+            icon={runningEntry ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+          >
+            {runningEntry ? 'Pause Timer' : 'Start Timer'}
+          </Button>
+          
+          <Button variant="outline" size="sm" onClick={() => setShowManualEntry(true)}>
+            <Plus className="w-3.5 h-3.5 mr-1" />
+            Manual Entry
+          </Button>
+        </div>
+      </div>
+
+      {/* Active Timer Card */}
+      {runningEntry && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-4 sm:p-5 border-b border-slate-200 bg-sky-50/50"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-sky-100 flex items-center justify-center">
+                <motion.div
+                  animate={{ scale: [1, 1.1, 1] }}
+                  transition={{ duration: 1, repeat: Infinity }}
+                  className="w-6 h-6 text-sky-600"
+                >
+                  <Zap className="w-6 h-6 animate-pulse" />
+                </motion.div>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-sky-700 uppercase tracking-wider">Timer Running</p>
+                <TimerDisplay seconds={runningEntry.duration} isRunning={true} isOverSLA={isOverSLA} />
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={`px-2 py-1 rounded-full text-xs font-bold ${runningEntry.isOverSLA ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                {runningEntry.isOverSLA ? 'OVER SLA' : 'ON TRACK'}
+              </span>
+              <Button 
+                variant="secondary" 
+                size="sm" 
+                onClick={() => onStopTimer(runningEntry.id)}
+                icon={<Pause className="w-3.5 h-3.5" />}
+              >
+                Stop
+              </Button>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {/* SLA Progress */}
+      <div className="p-4 sm:p-5 border-b border-slate-200">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">SLA Progress</span>
+          <span className="text-xs font-bold text-slate-500">
+            {isOverSLA ? 'OVER LIMIT' : `${formatSLA(slaRemaining)} remaining`}
+          </span>
+        </div>
+        <div className="h-2 rounded-full bg-slate-200 overflow-hidden">
+          <motion.div
+            initial={{ width: 0 }}
+            animate={{ width: `${Math.min(100, slaProgress)}%` }}
+            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+            className={`h-full rounded-full transition-all duration-500 ${isOverSLA ? 'bg-red-500' : 'bg-emerald-500'}`}
+            style={{ width: `${Math.min(100, slaProgress)}%` }}
+          />
+        </div>
+        <div className="flex justify-between text-[10px] text-slate-500 mt-1">
+          <span>Limit: {formatSLA(slaLimit)}</span>
+          <span>Used: {formatDuration(totalTime)}</span>
+          <span className={isOverSLA ? 'text-red-600' : 'text-slate-500'}>
+            {isOverSLA ? `Over by ${formatSLA(totalTime - slaLimit)}` : `Remaining: ${formatSLA(slaRemaining)}`}
+          </span>
+        </div>
+      </div>
+
+      {/* Time Entries List */}
+      <div className="divide-y divide-slate-100">
+        {userEntries.length === 0 && !showManualEntry && (
+          <div className="p-8 text-center text-slate-400">
+            <Clock className="w-10 h-10 mx-auto mb-2 text-slate-300" />
+            <p className="text-sm font-medium text-slate-500">No time entries yet</p>
+            <p className="text-xs text-slate-400 mt-1">Start the timer or add a manual entry</p>
+          </div>
+        )}
+
+        <AnimatePresence>
+          {userEntries.map((entry, index) => (
+            <motion.div
+              key={entry.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              transition={{ delay: index * 0.03, duration: 0.2 }}
+              className="relative"
+            >
+              <TimeEntryRow
+                entry={entry}
+                isEditing={editingEntry === entry.id}
+                editDescription={editDescription}
+                setEditDescription={setEditDescription}
+                onEdit={() => { setEditingEntry(entry.id); setEditDescription(entry.description || ''); }}
+                onSave={() => { onUpdateEntry(entry.id, { description: editDescription }); setEditingEntry(null); }}
+                onCancel={() => { setEditingEntry(null); setEditDescription(''); }}
+                onDelete={() => onDeleteEntry(entry.id)}
+                formatDuration={formatDuration}
+              />
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+
+      {/* Manual Entry Dialog */}
+      <AnimatePresence>
+        {showManualEntry && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
+            onClick={() => setShowManualEntry(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+              className="bg-white rounded-2xl max-w-md w-full p-6 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)]"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-slate-900">Add Manual Time Entry</h3>
+                <button type="button" onClick={() => setShowManualEntry(false)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Duration
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <Input
+                      type="number"
+                      value={Math.floor(manualDuration / 3600)}
+                      onChange={e => setManualDuration(Math.max(0, parseInt(e.target.value) * 3600 + (manualDuration % 3600)))}
+                      placeholder="Hours"
+                      min={0}
+                    />
+                    <Input
+                      type="number"
+                      value={Math.floor((manualDuration % 3600) / 60)}
+                      onChange={e => setManualDuration(Math.max(0, manualDuration - manualDuration % 3600 + parseInt(e.target.value) * 60))}
+                      placeholder="Minutes"
+                      min={0}
+                      max={59}
+                    />
+                    <Input
+                      type="number"
+                      value={manualDuration % 60}
+                      onChange={e => setManualDuration(Math.max(0, manualDuration - manualDuration % 60 + parseInt(e.target.value)))}
+                      placeholder="Seconds"
+                      min={0}
+                      max={59}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Date
+                  </label>
+                  <Input
+                    type="date"
+                    value={manualDate}
+                    onChange={e => setManualDate(e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Description
+                  </label>
+                  <textarea
+                    value={manualDescription}
+                    onChange={e => setManualDescription(e.target.value)}
+                    rows={3}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    placeholder="What did you work on?"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button variant="secondary" onClick={() => { setShowManualEntry(false); setManualDescription(''); setManualDuration(0); }}>Cancel</Button>
+                  <Button 
+                    onClick={() => {
+                      if (manualDuration > 0) {
+                        onAddManualEntry(ticket.id, {
+                          ticketId: ticket.id,
+                          startTime: new Date(manualDate).toISOString(),
+                          endTime: new Date(new Date(manualDate).getTime() + manualDuration * 1000).toISOString(),
+                          duration: manualDuration,
+                          description: manualDescription,
+                          isRunning: false,
+                        });
+                        setShowManualEntry(false);
+                        setManualDescription('');
+                        setManualDuration(0);
+                      }
+                    }}
+                    disabled={manualDuration === 0}
+                  >
+                    Add Entry
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function TimeEntryRow({
+  entry,
+  isEditing,
+  editDescription,
+  setEditDescription,
+  onEdit,
+  onSave,
+  onCancel,
+  onDelete,
+  formatDuration,
+}: {
+  entry: any;
+  isEditing: boolean;
+  editDescription: string;
+  setEditDescription: (v: string) => void;
+  onEdit: () => void;
+  onSave: () => void;
+  onCancel: () => void;
+  onDelete: () => void;
+  formatDuration: (s: number) => string;
+}) {
+  return (
+    <motion.div
+      key={entry.id}
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, x: 20 }}
+      className="p-4 hover:bg-slate-50/50 transition"
+    >
+      {isEditing ? (
+        <div className="space-y-3">
+          <textarea
+            value={editDescription}
+            onChange={e => setEditDescription(e.target.value)}
+            rows={2}
+            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            placeholder="Description..."
+            autoFocus
+          />
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" size="sm" onClick={onCancel}>Cancel</Button>
+            <Button size="sm" onClick={onSave}>Save</Button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-medium text-slate-900">
+                {entry.description || 'No description'}
+              </span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 text-sky-700">
+                {entry.isRunning ? 'Running' : 'Completed'}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-slate-500 mt-1 flex-wrap">
+              <span className="flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5" />
+                {formatDuration(entry.duration)}
+              </span>
+              <span className="flex items-center gap-1">
+                <Calendar className="w-3.5 h-3.5" />
+                {new Date(entry.startTime).toLocaleDateString()}
+              </span>
+              {entry.endTime && (
+                <span className="flex items-center gap-1">
+                  <Clock className="w-3.5 h-3.5" />
+                  {new Date(entry.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-1">
+            <button type="button" onClick={onEdit} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600" aria-label="Edit">
+              <Edit className="w-4 h-4" />
+            </button>
+            <button type="button" onClick={onDelete} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-red-600" aria-label="Delete">
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
+export function SLAIndicator({ 
+  ticket, 
+  totalTime, 
+  slaConfig 
+}: { 
+  ticket: any; 
+  totalTime: number; 
+  slaConfig?: Partial<SLAConfig>;
+}) {
+  const slaConfigFinal = { ...SLA_CONFIG, ...slaConfig };
+  const slaLimit = ticket.priority ? SLA_CONFIG[ticket.priority as keyof SLAConfig] : 24 * 60 * 60;
+  const isOverSLA = totalTime > slaLimit;
+  const slaRemaining = Math.max(0, slaLimit - totalTime);
+  const slaProgress = Math.min(100, (totalTime / slaLimit) * 100);
+
+  return (
+    <div className="p-3 bg-white rounded-xl border border-slate-200">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">SLA Status</span>
+        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${isOverSLA ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
+          {isOverSLA ? 'OVER SLA' : 'ON TRACK'}
+        </span>
+      </div>
+      <div className="h-2 rounded-full bg-slate-200 overflow-hidden">
+        <motion.div
+          initial={{ width: 0 }}
+          animate={{ width: `${Math.min(100, (totalTime / (slaLimit || 1)) * 100)}%` }}
+          transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+          className={`h-full rounded-full ${isOverSLA ? 'bg-red-500' : 'bg-emerald-500'}`}
+        />
+      </div>
+      <div className="flex justify-between text-[10px] text-slate-500 mt-1">
+        <span>Limit: {formatSLA(slaLimit)}</span>
+        <span className={isOverSLA ? 'text-red-600' : 'text-slate-500'}>
+          {isOverSLA ? `Over by ${formatSLA(totalTime - slaLimit)}` : `Remaining: ${formatSLA(slaRemaining)}`}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+export function TimeTrackingDashboard({
+  tickets,
+  currentUser,
+}: {
+  tickets: any[];
+  currentUser: { id: string; name: string };
+}) {
+  const enabled = useFeatureFlag('time-tracking');
+  
+  if (!enabled) return null;
+
+  const userTickets = tickets.filter(t => t.assignee?.id === currentUser.id);
+  const totalTracked = userTickets.reduce((sum, t) => sum + (t.timeTracked || 0), 0);
+  const overdueCount = userTickets.filter(t => t.isOverSLA).length;
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-white rounded-2xl border border-slate-200 p-5">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-sky-100 flex items-center justify-center">
+              <Clock className="w-5 h-5 text-sky-600" />
+            </div>
+            <div>
+              <p className="text-xs text-slate-500 uppercase tracking-wider">Total Tracked</p>
+              <p className="text-2xl font-black text-slate-900">{formatDuration(totalTracked)}</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-200 p-5">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+            </div>
+            <div>
+              <p className="text-xs text-slate-500 uppercase tracking-wider">Active Tickets</p>
+              <p className="text-2xl font-black text-slate-900">{userTickets.length}</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-200 p-5">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center">
+              <AlertTriangle className="w-5 h-5 text-red-600" />
+            </div>
+            <div>
+              <p className="text-xs text-slate-500 uppercase tracking-wider">Over SLA</p>
+              <p className="text-2xl font-black text-red-600">{overdueCount}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+

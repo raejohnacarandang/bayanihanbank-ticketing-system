@@ -1,0 +1,339 @@
+import React, { useState, useCallback, useMemo } from 'react';
+import { motion } from 'motion/react';
+import {
+  Plus,
+  Search,
+  ChevronDown,
+  MoreVertical,
+  User,
+  Calendar,
+  Flag,
+} from 'lucide-react';
+import { useFeatureFlag } from '../../hooks/useFeatureFlags';
+import { DragDropList } from './DragDrop';
+import { Button } from './MicroInteractions';
+import { EmptyState } from './EmptyState';
+
+interface KanbanTicket {
+  id: string;
+  subject: string;
+  description: string;
+  status: 'In Progress' | 'Resolved';
+  priority: 'Critical' | 'High' | 'Medium' | 'Low';
+  assignee?: { id: string; name: string; avatar?: string };
+  reporter: { name: string; avatar?: string };
+  branch: string;
+  createdAt: string;
+  updatedAt: string;
+  dueDate?: string;
+  tags?: string[];
+}
+
+interface KanbanColumn {
+  id: 'In Progress' | 'Resolved';
+  title: string;
+  color: string;
+  bgColor: string;
+}
+
+const columns: KanbanColumn[] = [
+  { id: 'In Progress', title: 'In Progress', color: 'amber', bgColor: 'bg-amber-50' },
+  { id: 'Resolved', title: 'Resolved', color: 'emerald', bgColor: 'bg-emerald-50' },
+];
+
+const priorityColors: Record<string, string> = {
+  Critical: 'bg-red-500',
+  High: 'bg-amber-500',
+  Medium: 'bg-sky-500',
+  Low: 'bg-slate-400',
+};
+
+interface KanbanBoardProps {
+  tickets: KanbanTicket[];
+  onTicketClick: (ticket: KanbanTicket) => void;
+  onCreateTicket: () => void;
+  onUpdateStatus: (ticketId: string, newStatus: 'In Progress' | 'Resolved') => void;
+  onAssignTicket?: (ticketId: string, assigneeId: string) => void;
+  currentUser: { id: string; name: string; role: string };
+  isLoading?: boolean;
+}
+
+export function KanbanBoard({
+  tickets,
+  onTicketClick: _onTicketClick,
+  onCreateTicket,
+  onUpdateStatus,
+  onAssignTicket: _onAssignTicket,
+  currentUser: _currentUser,
+  isLoading,
+}: KanbanBoardProps) {
+  const enabled = useFeatureFlag('kanban-board');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterPriority, setFilterPriority] = useState<string>('all');
+  const [filterAssignee, setFilterAssignee] = useState<string>('all');
+  const [, setExpandedTickets] = useState<Set<string>>(new Set());
+
+
+  const filteredTickets = useMemo(() => {
+    return tickets.filter(ticket => {
+      const matchesSearch = !searchQuery || 
+        ticket.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        ticket.branch.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        ticket.reporter.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        ticket.assignee?.name.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      const matchesPriority = filterPriority === 'all' || ticket.priority === filterPriority;
+      const matchesAssignee = filterAssignee === 'all' || ticket.assignee?.id === filterAssignee;
+      
+      return matchesSearch && matchesPriority && matchesAssignee;
+    });
+  }, [tickets, searchQuery, filterPriority, filterAssignee]);
+
+  const ticketsByStatus = useMemo(() => {
+    const grouped: Record<string, KanbanTicket[]> = {
+      'In Progress': [],
+      'Resolved': [],
+    };
+    
+    filteredTickets.forEach(ticket => {
+      if (grouped[ticket.status]) {
+        grouped[ticket.status].push(ticket);
+      }
+    });
+    return grouped;
+  }, [filteredTickets]);
+
+
+  const getAssignees = useMemo(() => {
+    const assignees = new Map<string, { id: string; name: string; avatar?: string }>();
+    tickets.forEach(t => {
+      if (t.assignee) assignees.set(t.assignee.id!, { id: t.assignee.id!, name: t.assignee.name, avatar: t.assignee.avatar });
+    });
+    return Array.from(assignees.values());
+  }, [tickets]);
+
+  if (!enabled) {
+    return (
+      <div className="p-6 text-center text-slate-500">
+        <p>Kanban board is not available</p>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {columns.map(col => (
+          <div key={col.id} className="bg-white rounded-2xl border border-slate-200">
+            <div className="p-4 border-b border-slate-200">
+              <h3 className="font-bold text-slate-900">{col.title}</h3>
+            </div>
+            <div className="p-4 space-y-4 min-h-[400px]">
+              {[1,2,3].map(i => <div key={i} className="h-32 bg-slate-100 rounded-xl animate-pulse" />)}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Kanban Board</h1>
+          <p className="text-slate-500 mt-1">Drag and drop tickets between statuses</p>
+        </div>
+        <Button onClick={onCreateTicket} icon={<Plus className="w-4 h-4" />}>
+          New Ticket
+        </Button>
+      </div>
+
+      {/* Filters */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-4 flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Search tickets..."
+            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          />
+        </div>
+
+        <select
+          value={filterPriority}
+          onChange={e => setFilterPriority(e.target.value)}
+          className="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        >
+          <option value="all">All Priorities</option>
+          <option value="Critical">Critical</option>
+          <option value="High">High</option>
+          <option value="Medium">Medium</option>
+          <option value="Low">Low</option>
+        </select>
+
+        <select
+          value={filterAssignee}
+          onChange={e => setFilterAssignee(e.target.value)}
+          className="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        >
+          <option value="all">All Assignees</option>
+          {getAssignees.map(a => (
+            <option key={a.id} value={a.id}>{a.name}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Kanban Board */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 min-h-[600px]">
+        {columns.map(column => (
+          <motion.div
+            key={column.id}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.05 * columns.indexOf(column), duration: 0.3 }}
+            className="flex flex-col"
+          >
+            {/* Column Header */}
+            <div className={`
+              px-4 py-3 rounded-t-2xl border-b border-slate-200 ${column.bgColor}
+              flex items-center justify-between
+            `}>
+              <div className="flex items-center gap-3">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white ${column.color === 'amber' ? 'bg-amber-500' : 'bg-emerald-500'}`}>
+                  {column.id === 'In Progress' ? (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 11l-2-2 2-2-4 4m-2 2l-2-2-2 2-4-4" />
+                    </svg>
+                  )}
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900">{column.title}</h3>
+                  <p className="text-sm text-slate-500">
+                    {ticketsByStatus[column.id]?.length || 0} tickets
+                  </p>
+                </div>
+              </div>
+              <button type="button"
+                onClick={() => setExpandedTickets(prev => {
+                  const next = new Set(prev);
+                  if (next.has(column.id)) next.delete(column.id);
+                  else next.add(column.id);
+                  return next;
+                })}
+                className="p-1.5 rounded-lg hover:bg-white/50 transition"
+              >
+                <ChevronDown className="w-5 h-5 text-slate-500" />
+              </button>
+            </div>
+
+            {/* Ticket List */}
+            <div className="flex-1 overflow-y-auto p-3 space-y-3 min-h-[400px] bg-white rounded-b-2xl"
+              role="list"
+              aria-label={`${column.title} tickets`}
+            >
+              {ticketsByStatus[column.id]?.length === 0 ? (
+                <EmptyState
+                  illustration="tickets"
+                  title="No tickets"
+                  description={`No tickets in ${column.title.toLowerCase()}`}
+                  className="h-full py-12"
+                />
+              ) : (
+                <DragDropList
+                  items={ticketsByStatus[column.id]?.map(t => ({ id: t.id, data: t })) || []}
+                  onReorder={() => {}}
+                  renderItem={(item, dragHandle, _isSelected) => (
+                    <TicketCard
+                      ticket={item.data}
+                      onClick={() => { /* expand */ }}
+                      dragHandle={dragHandle}
+                      isSelected={false}
+                      expanded={false}
+                    />
+                  )}
+                  disabled={false}
+                />
+              )}
+            </div>
+          </motion.div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TicketCard({ 
+  ticket, 
+  onClick, 
+  dragHandle,
+  isSelected: _isSelected,
+  expanded: _expanded
+}: { 
+  ticket: KanbanTicket; 
+  onClick: () => void; 
+  dragHandle: React.ReactNode;
+  isSelected: boolean;
+  expanded: boolean;
+}) {
+  
+  return (
+    <div 
+      className="bg-white rounded-xl border border-slate-200 hover:shadow-md transition-shadow"
+      onClick={onClick}
+    >
+      <div className="p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-emerald-600" />
+              {dragHandle}
+            </div>
+            
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h4 className="font-semibold text-slate-900 truncate">{ticket.subject}</h4>
+                <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${priorityColors[ticket.priority]} text-white`}>
+                  {ticket.priority}
+                </span>
+              </div>
+              
+              <div className="flex items-center gap-2 text-sm text-slate-500 mt-1 flex-wrap">
+                <span className="flex items-center gap-1">
+                  <User className="w-3.5 h-3.5" />
+                  {ticket.assignee?.name || 'Unassigned'}
+                </span>
+                <span className="flex items-center gap-1">
+                  <Calendar className="w-3.5 h-3.5" />
+                  {new Date(ticket.createdAt).toLocaleDateString()}
+                </span>
+                <span className="flex items-center gap-1">
+                  <Flag className="w-3.5 h-3.5" />
+                  {ticket.branch}
+                </span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="relative">
+            <button type="button"
+              onClick={e => { e.stopPropagation(); }}
+              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+            >
+              <MoreVertical className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default KanbanBoard;

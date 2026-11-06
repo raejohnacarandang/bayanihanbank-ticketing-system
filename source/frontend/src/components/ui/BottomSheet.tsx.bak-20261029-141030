@@ -1,0 +1,270 @@
+import React, { useEffect, useRef, useCallback } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { X, ChevronDown, GripVertical } from 'lucide-react';
+
+interface BottomSheetProps {
+  isOpen: boolean;
+  onClose: () => void;
+  title?: string;
+  subtitle?: string;
+  children: React.ReactNode;
+  snapPoints?: ('25%' | '50%' | '75%' | '90%' | 'full')[];
+  defaultSnap?: '25%' | '50%' | '75%' | '90%' | 'full';
+  showDragIndicator?: boolean;
+  closeOnOverlayClick?: boolean;
+  closeOnEscape?: boolean;
+  className?: string;
+  onSnapChange?: (snap: string) => void;
+}
+
+const SNAP_HEIGHTS: Record<string, number> = {
+  '25%': 0.25,
+  '50%': 0.5,
+  '75%': 0.75,
+  '90%': 0.9,
+  'full': 1,
+};
+
+export function BottomSheet({
+  isOpen,
+  onClose,
+  title,
+  subtitle,
+  children,
+  snapPoints = ['50%', '90%', 'full'],
+  defaultSnap = '50%',
+  showDragIndicator = true,
+  closeOnOverlayClick = true,
+  closeOnEscape = true,
+  className = '',
+  onSnapChange,
+}: BottomSheetProps) {
+  const [currentSnap, setCurrentSnap] = React.useState<string>(defaultSnap);
+  const [dragOffset, setDragOffset] = React.useState(0);
+  const [isDragging, setIsDragging] = React.useState(false);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const startY = useRef(0);
+  const startSnap = useRef<string>(defaultSnap);
+
+  const snapOrder = snapPoints;
+  const snapHeights = snapPoints.map(s => SNAP_HEIGHTS[s] || 0.5);
+  const maxHeight = Math.max(...snapHeights) * 100;
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && closeOnEscape) {
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = '';
+    };
+  }, [isOpen, closeOnEscape]);
+
+  const snapHeightsMap: Record<string, number> = {
+    '25%': 25,
+    '50%': 50,
+    '75%': 75,
+    '90%': 90,
+    'full': 100,
+  };
+
+  const getSnapHeight = (snap: string) => snapHeightsMap[snap] || 50;
+
+  const handleDragStart = useCallback((e: React.TouchEvent | React.MouseEvent) => {
+    if (!isDragging) return;
+    setIsDragging(true);
+    startY.current = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    startSnap.current = currentSnap;
+  }, []);
+
+  const handleDragMove = useCallback((e: React.TouchEvent | React.MouseEvent) => {
+    if (!isDragging) return;
+    const currentY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    const deltaY = startY.current - currentY;
+    const viewportHeight = window.innerHeight;
+    const dragPercent = (deltaY / viewportHeight) * 100;
+    setDragOffset(dragPercent);
+  }, [isDragging]);
+
+  const handleDragEnd = useCallback(() => {
+    if (!isDragging) return;
+    setIsDragging(false);
+
+    const currentSnapHeight = getSnapHeight(currentSnap);
+    const newHeight = currentSnapHeight - dragOffset;
+
+    // Find closest snap point
+    let closestSnap = snapPoints[0];
+    let minDiff = Infinity;
+
+    for (const snap of snapPoints) {
+      const snapHeight = getSnapHeight(snap);
+      const diff = Math.abs(snapHeight - (currentSnapHeight - dragOffset));
+      if (diff < minDiff) {
+        minDiff = diff;
+        closestSnap = snap;
+      }
+    }
+
+    setCurrentSnap(closestSnap);
+    setDragOffset(0);
+    onSnapChange?.(closestSnap);
+  }, [currentSnap, dragOffset, snapPoints, onSnapChange]);
+
+  useEffect(() => {
+    if (isDragging) {
+      window.addEventListener('touchmove', handleDragMove as any, { passive: false });
+      window.addEventListener('mousemove', handleDragMove as any);
+      window.addEventListener('touchend', handleDragEnd);
+      window.addEventListener('mouseup', handleDragEnd);
+      return () => {
+        window.removeEventListener('touchmove', handleDragMove as any);
+        window.removeEventListener('mousemove', handleDragMove as any);
+        window.removeEventListener('touchend', handleDragEnd);
+        window.removeEventListener('mouseup', handleDragEnd);
+      };
+    }
+  }, [isDragging, handleDragMove, handleDragEnd]);
+
+  const contentHeight = getSnapHeight(currentSnap) + (isDragging ? dragOffset : 0);
+
+  const handleOverlayClick = () => {
+    if (closeOnOverlayClick) onClose();
+  };
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-40 bg-slate-900/60 backdrop-blur-sm"
+            onClick={handleOverlayClick}
+            aria-hidden="true"
+          />
+
+          <motion.div
+            initial={{ y: '100%', opacity: 0 }}
+            animate={{ 
+              y: 0, 
+              opacity: 1,
+              height: isDragging ? `${Math.max(contentHeight, 0)}%` : `${getSnapHeight(currentSnap)}%`
+            }}
+            exit={{ y: '100%', opacity: 0 }}
+            transition={{ 
+              type: 'spring', 
+              stiffness: 500, 
+              damping: 30,
+              duration: 0.3
+            }}
+            className={`fixed inset-x-0 bottom-0 z-50 ${className}`}
+            style={{
+              height: isDragging ? `${Math.max(contentHeight, 0)}%` : `${getSnapHeight(currentSnap)}%`,
+              maxHeight: `${Math.max(...snapPoints.map(s => SNAP_HEIGHTS[s] || 0)) * 100}%`,
+            }}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={title ? 'bottom-sheet-title' : undefined}
+          >
+            {/* Drag Handle */}
+            <div
+              onTouchStart={handleDragStart}
+              onMouseDown={handleDragStart}
+              className="w-full flex flex-col items-center pt-3 pb-2"
+            >
+              {showDragIndicator && (
+                <div className="w-10 h-1.5 rounded-full bg-slate-300 mx-auto mb-2" />
+              )}
+              {(title || subtitle) && (
+                <div className="px-4 text-center">
+                  {title && <h2 className="text-lg font-bold text-slate-900">{title}</h2>}
+                  {subtitle && <p className="text-sm text-slate-500 mt-1">{subtitle}</p>}
+                </div>
+              )}
+            </div>
+
+            {/* Close Button */}
+            <button type="button"
+              onClick={onClose}
+              className="absolute top-3 right-3 p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-700 transition z-10"
+              aria-label="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Content */}
+            <div 
+              className="overflow-y-auto px-4 pb-6 pt-2"
+              style={{ maxHeight: `calc(${getSnapHeight(currentSnap)}% - 100px)` }}
+            >
+              {children}
+            </div>
+
+            {/* Snap Points Indicator */}
+            {snapPoints.length > 1 && (
+              <div className="px-4 pb-3">
+                <div className="flex items-center justify-center gap-2">
+                  {snapPoints.map((snap, index) => (
+                    <button type="button"
+                      key={snap}
+                      onClick={() => {
+                        setCurrentSnap(snap);
+                        onSnapChange?.(snap);
+                      }}
+                      className={`w-2.5 h-2.5 rounded-full transition-all duration-200 ${
+                        currentSnap === snap 
+                          ? 'bg-emerald-500 ring-2 ring-emerald-500 ring-offset-2' 
+                          : 'bg-slate-300 hover:bg-slate-400'
+                      }`}
+                      aria-label={`Snap to ${snap}`}
+                      aria-current={currentSnap === snap ? 'true' : 'false'}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </motion.div>
+        </>
+      )}
+    </>
+  );
+}
+
+export function useBottomSheet() {
+  const [isOpen, setIsOpen] = React.useState(false);
+  const [snap, setSnap] = React.useState<string>('50%');
+
+  const open = React.useCallback(() => setIsOpen(true), []);
+  const close = React.useCallback(() => setIsOpen(false), []);
+  const toggle = React.useCallback(() => setIsOpen(prev => !prev), []);
+
+  return { isOpen, snap, open, close, toggle, setSnap };
+}
+
+export function BottomSheetTrigger({
+  children,
+  isOpen,
+  onClose,
+  snapPoints = ['50%', '90%', 'full'],
+  defaultSnap = '50%',
+}: {
+  children: React.ReactElement;
+  isOpen: boolean;
+  onClose: () => void;
+  snapPoints?: ('25%' | '50%' | '75%' | '90%' | 'full')[];
+  defaultSnap?: '25%' | '50%' | '75%' | '90%' | 'full';
+}) {
+  return React.cloneElement(children, {
+    onClick: () => {},
+    // The trigger element just needs to exist
+  });
+}

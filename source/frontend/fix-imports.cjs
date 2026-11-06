@@ -1,0 +1,10 @@
+const fs = require('fs');
+const file = 'src/views/dashboard/AdminDashboardView.tsx';
+let s = fs.readFileSync(file, 'utf8');
+s = s.replace(/from "\.\.\/components\//g, 'from "../../components/');
+s = s.replace(/from "\.\.\/services\//g, 'from "../../services/');
+s = s.replace(/from "\.\.\/types"/g, 'from "../../types"');
+s = s.replace(/from "\.\.\/routes"/g, 'from "../../routes"');
+s = s.replace(/from "\.\.\/components\/admin\/types"/g, 'from "../../components/admin/types"');
+fs.writeFileSync(file, s);
+console.log('Fixed imports');

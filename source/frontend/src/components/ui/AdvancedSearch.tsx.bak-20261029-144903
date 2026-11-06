@@ -1,0 +1,517 @@
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { 
+  Search, 
+  Filter, 
+  ChevronDown, 
+  ChevronUp,
+  Calendar,
+  Clock,
+  Tag,
+  User,
+  Building2,
+  Flag,
+  Download,
+  Save,
+  Trash2,
+  Plus,
+  X,
+  SlidersHorizontal,
+  RefreshCw,
+  ArrowUpDown,
+  LayoutDashboard,
+  Settings,
+  BarChart3
+} from 'lucide-react';
+import { useFeatureFlag } from '../../hooks/useFeatureFlags';
+import { Button } from './MicroInteractions';
+import { Input } from './MicroInteractions';
+import { Select } from './MicroInteractions';
+
+interface SavedFilter {
+  id: string;
+  name: string;
+  filters: SearchFilters;
+  createdAt: string;
+  isDefault?: boolean;
+}
+
+interface SearchFilters {
+  query: string;
+  status: string[];
+  priority: string[];
+  category: string[];
+  assignee: string[];
+  branch: string[];
+  dateRange: { from: string; to: string } | null;
+  tags: string[];
+}
+
+interface AdvancedSearchProps {
+  tickets: any[];
+  onSearch: (filters: SearchFilters) => void;
+  onSaveFilter: (name: string, filters: SearchFilters) => void;
+  onLoadFilter: (filter: SavedFilter) => void;
+  onDeleteFilter: (id: string) => void;
+  savedFilters: SavedFilter[];
+  currentFilters: SearchFilters;
+  availableAssignees: { id: string; name: string }[];
+  availableBranches: { id: string; name: string }[];
+  availableCategories: string[];
+  availableTags: string[];
+  availableStatuses: string[];
+  availablePriorities: string[];
+}
+
+export function AdvancedSearch({
+  tickets,
+  onSearch,
+  onSaveFilter,
+  onLoadFilter,
+  onDeleteFilter,
+  savedFilters,
+  currentFilters,
+  availableAssignees,
+  availableBranches,
+  availableCategories,
+  availableTags,
+  availableStatuses,
+  availablePriorities,
+}: AdvancedSearchProps) {
+  const [filters, setFilters] = useState<SearchFilters>(currentFilters);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [saveFilterName, setSaveFilterName] = useState('');
+  const [editingFilter, setEditingFilter] = useState<SavedFilter | null>(null);
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  useEffect(() => {
+    setFilters(currentFilters);
+  }, [currentFilters]);
+
+  const handleFilterChange = useCallback((key: keyof SearchFilters, value: any) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+  }, []);
+
+  const handleSearch = useCallback(() => {
+    onSearch(filters);
+  }, [filters, onSearch]);
+
+  const handleSaveFilter = useCallback(() => {
+    if (saveFilterName.trim()) {
+      onSaveFilter(saveFilterName.trim(), filters);
+      setSaveFilterName('');
+      setShowSaveDialog(false);
+    }
+  }, [saveFilterName, filters, onSaveFilter]);
+
+  const handleLoadFilter = useCallback((filter: SavedFilter) => {
+    setFilters(filter.filters);
+    onLoadFilter(filter);
+  }, [onLoadFilter]);
+
+  const handleDeleteFilter = useCallback((id: string) => {
+    if (window.confirm('Delete this saved filter?')) {
+      onDeleteFilter(id);
+    }
+  }, [onDeleteFilter]);
+
+  const hasActiveFilters = useMemo(() => {
+    return !!filters.query ||
+      filters.status.length > 0 ||
+      filters.priority.length > 0 ||
+      filters.category.length > 0 ||
+      filters.assignee.length > 0 ||
+      filters.branch.length > 0 ||
+      filters.dateRange !== null ||
+      filters.tags.length > 0;
+  }, [filters]);
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (filters.query) count++;
+    if (filters.status.length) count++;
+    if (filters.priority.length) count++;
+    if (filters.category.length) count++;
+    if (filters.assignee.length) count++;
+    if (filters.branch.length) count++;
+    if (filters.dateRange) count++;
+    if (filters.tags.length) count++;
+    return count;
+  }, [filters]);
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm">
+      <div className="p-4 sm:p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-sky-100 flex items-center justify-center">
+            <SlidersHorizontal className="w-5 h-5 text-sky-600" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-slate-900">Advanced Search</h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {activeFilterCount} active filter{activeFilterCount !== 1 ? 's' : ''}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="secondary" size="sm" onClick={() => setIsExpanded(!isExpanded)}>
+            {isExpanded ? <ChevronUp className="w-4 h-4 mr-1" /> : <ChevronDown className="w-4 h-4 mr-1" />}
+            {isExpanded ? 'Collapse' : 'More Filters'}
+          </Button>
+
+          {hasActiveFilters && (
+            <Button variant="secondary" size="sm" onClick={() => {
+              setFilters({
+                query: '',
+                status: [],
+                priority: [],
+                category: [],
+                assignee: [],
+                branch: [],
+                dateRange: null,
+                tags: [],
+              });
+            }}>
+              <X className="w-3.5 h-3.5 mr-1" />
+              Clear All
+            </Button>
+          )}
+
+          <Button variant="secondary" size="sm" onClick={() => setShowSaveDialog(true)}>
+            <Save className="w-3.5 h-3.5 mr-1" />
+            Save Filter
+          </Button>
+
+          <Button onClick={handleSearch} variant="primary">
+            <Search className="w-3.5 h-3.5 mr-1" />
+            Search
+          </Button>
+        </div>
+      </div>
+
+      <AnimatePresence>
+        {showAdvanced && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="p-4 sm:p-5 border-t border-slate-200 space-y-5"
+          >
+            {/* Text Search */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                Keyword Search
+              </label>
+              <Input
+                value={filters.query}
+                onChange={e => handleFilterChange('query', e.target.value)}
+                placeholder="Search in subject, description, branch, assignee..."
+                leftIcon={<Search className="w-4 h-4" />}
+              />
+            </div>
+
+            {/* Multi-select Filters Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <MultiSelectFilter
+                label="Status"
+                options={availableStatuses.map(s => ({ value: s, label: s }))}
+                selected={filters.status}
+                onChange={v => handleFilterChange('status', v)}
+                placeholder="All statuses"
+              />
+
+              <MultiSelectFilter
+                label="Priority"
+                options={availablePriorities.map(p => ({ value: p, label: p }))}
+                selected={filters.priority}
+                onChange={v => handleFilterChange('priority', v)}
+                placeholder="All priorities"
+              />
+
+              <MultiSelectFilter
+                label="Category"
+                options={availableCategories.map(c => ({ value: c, label: c }))}
+                selected={filters.category}
+                onChange={v => handleFilterChange('category', v)}
+                placeholder="All categories"
+              />
+
+              <MultiSelectFilter
+                label="Tags"
+                options={availableTags.map(t => ({ value: t, label: t }))}
+                selected={filters.tags}
+                onChange={v => handleFilterChange('tags', v)}
+                placeholder="All tags"
+              />
+            </div>
+
+            {/* Assignee & Branch */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <MultiSelectFilter
+                label="Assignee"
+                options={availableAssignees.map(a => ({ value: a.id, label: a.name }))}
+                selected={filters.assignee}
+                onChange={v => handleFilterChange('assignee', v)}
+                placeholder="All assignees"
+              />
+
+              <MultiSelectFilter
+                label="Branch"
+                options={availableBranches.map(b => ({ value: b.id, label: b.name }))}
+                selected={filters.branch}
+                onChange={v => handleFilterChange('branch', v)}
+                placeholder="All branches"
+              />
+            </div>
+
+            {/* Date Range */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Date Range
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <Input
+                    type="date"
+                    value={filters.dateRange?.from || ''}
+                    onChange={e => handleFilterChange('dateRange', { ...filters.dateRange, from: e.target.value })}
+                    placeholder="From"
+                  />
+                  <Input
+                    type="date"
+                    value={filters.dateRange?.to || ''}
+                    onChange={e => handleFilterChange('dateRange', { ...filters.dateRange, to: e.target.value })}
+                    placeholder="To"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Quick Date
+                </label>
+                <select
+                  onChange={e => {
+                    const value = e.target.value;
+                    if (value) {
+                      const now = new Date();
+                      let from = new Date();
+                      switch (value) {
+                        case 'today': from.setHours(0,0,0,0); break;
+                        case 'week': from.setDate(now.getDate() - 7); break;
+                        case 'month': from.setMonth(now.getMonth() - 1); break;
+                        case 'quarter': from.setMonth(now.getMonth() - 3); break;
+                        case 'year': from.setFullYear(now.getFullYear() - 1); break;
+                      }
+                      handleFilterChange('dateRange', { from: from.toISOString().split('T')[0], to: new Date().toISOString().split('T')[0] });
+                    } else {
+                      handleFilterChange('dateRange', null);
+                    }
+                  }}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="">Custom range...</option>
+                  <option value="today">Today</option>
+                  <option value="week">Last 7 days</option>
+                  <option value="month">Last 30 days</option>
+                  <option value="quarter">Last 90 days</option>
+                  <option value="year">Last year</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Tags */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                Tags
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {availableTags.map(tag => (
+                  <button type="button"
+                    key={tag}
+                    onClick={() => handleFilterChange('tags', 
+                      filters.tags.includes(tag) 
+                        ? filters.tags.filter(t => t !== tag) 
+                        : [...filters.tags, tag]
+                    )}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-full border transition ${
+                      filters.tags.includes(tag)
+                        ? 'bg-emerald-100 text-emerald-700 border-emerald-300'
+                        : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
+                    }`}
+                  >
+                    #{tag}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Saved Filters */}
+        {savedFilters.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="pt-4 border-t border-slate-200"
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-sm font-bold text-slate-900">Saved Filters</h4>
+            </div>
+            <div className="space-y-2 max-h-48 overflow-y-auto">
+              {savedFilters.map(filter => (
+                <div key={filter.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-200 hover:border-slate-300 transition cursor-pointer"
+                  onClick={() => handleLoadFilter(filter)}>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-slate-900 truncate">{filter.name}</span>
+                      {filter.isDefault && (
+                        <span className="px-1.5 py-0.5 text-[10px] font-bold bg-emerald-100 text-emerald-700 rounded">Default</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1 truncate">
+                      {Object.entries(filter.filters).map(([k, v]) => 
+                        Array.isArray(v) && v.length > 0 ? `${k}: ${v.join(', ')}` : 
+                        v && typeof v === 'object' ? `${k}: ${JSON.stringify(v)}` : 
+                        v ? `${k}: ${v}` : ''
+                      ).filter(Boolean).join(' • ')}
+                    </p>
+                  </div>
+                  <button type="button"
+                    onClick={e => { e.stopPropagation(); onDeleteFilter(filter.id); }}
+                    className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                    aria-label="Delete filter"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Save Filter Dialog */}
+      <AnimatePresence>
+        {showSaveDialog && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
+            onClick={() => setShowSaveDialog(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+              className="bg-white rounded-2xl max-w-md w-full p-6 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)]"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-slate-900">Save Current Filter</h3>
+                <button type="button" onClick={() => setShowSaveDialog(false)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <p className="text-sm text-slate-500 mb-4">Give this filter a name so you can quickly apply it later.</p>
+              <Input
+                value={saveFilterName}
+                onChange={e => setSaveFilterName(e.target.value)}
+                placeholder="My custom filter..."
+                autoFocus
+              />
+              <div className="flex justify-end gap-2 mt-5">
+                <Button variant="secondary" onClick={() => setShowSaveDialog(false)}>Cancel</Button>
+                <Button onClick={handleSaveFilter} disabled={!saveFilterName.trim()}>Save Filter</Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function MultiSelectFilter({
+  label,
+  options,
+  selected,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  options: { value: string; label: string }[];
+  selected: string[];
+  onChange: (value: string[]) => void;
+  placeholder: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div ref={ref} className="relative">
+      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+        {label}
+      </label>
+      <div className="relative">
+        <button type="button"
+          onClick={() => setOpen(!open)}
+          className={`w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl text-left transition focus:outline-none focus:ring-2 focus:ring-emerald-500 ${selected.length > 0 ? 'border-emerald-300 bg-emerald-50' : ''}`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="truncate">
+              {selected.length === 0 ? placeholder : selected.length === 1 ? options.find(o => o.value === selected[0])?.label : `${selected.length} selected`}
+            </span>
+            <ChevronDown className={`w-4 h-4 text-slate-400 transition transform ${!open ? 'rotate-180' : ''}`} />
+          </div>
+        </button>
+
+        <AnimatePresence>
+          {open && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.15 }}
+              className="absolute z-50 mt-1 w-full max-h-60 overflow-y-auto bg-white rounded-xl border border-slate-200 shadow-lg"
+            >
+              {options.map(opt => (
+                <label key={opt.value} className="flex items-center gap-2 px-3 py-2 hover:bg-slate-50 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selected.includes(opt.value)}
+                    onChange={e => onChange(e.target.checked 
+                      ? [...selected, opt.value] 
+                      : selected.filter(v => v !== opt.value)
+                    )}
+                    className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-2 focus:ring-emerald-500"
+                  />
+                  <span className="text-sm text-slate-700">{opt.label}</span>
+                </label>
+              ))}
+              <div className="border-t border-slate-100 p-2 flex justify-end gap-2">
+                <button type="button" onClick={() => onChange([])} className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-900">Clear all</button>
+                <button type="button" onClick={() => setOpen(false)} className="px-3 py-1.5 text-xs font-medium text-emerald-600 hover:text-emerald-700">Done</button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+}

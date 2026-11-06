@@ -1,0 +1,319 @@
+import { MobileTicketCard } from '../../components/ui/MobileTicketCard';
+import React, { useState } from 'react';
+import { motion } from 'motion/react';
+import { Ticket, User } from '../../types';
+import { StatusBadge } from '../../components/ui/Badge';
+import {
+  Ticket as TicketIcon,
+  Search,
+  AlertCircle,
+  PlayCircle,
+  CheckCircle2,
+  Eye,
+  Filter,
+  ShieldAlert,
+  ArrowRight,
+} from 'lucide-react';
+
+interface ItDashboardViewProps {
+  currentUser: User;
+  tickets: Ticket[];
+  onNavigateTicketDetail: (ticketId: string) => void;
+  onNavigateAllTickets: () => void;
+}
+
+export const ItDashboardView: React.FC<ItDashboardViewProps> = ({
+  tickets,
+  onNavigateTicketDetail,
+  onNavigateAllTickets,
+}) => {
+  const [branchFilter, setBranchFilter] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const totalCount = tickets.length;
+
+  const branchesList = Array.from(new Set(tickets.map((t) => t.branchName)));
+
+  const filteredTickets = tickets.filter((t) => {
+    const matchesBranch = branchFilter === 'ALL' || t.branchName === branchFilter;
+    const matchesStatus = statusFilter === 'ALL' || t.status === statusFilter;
+    const matchesSearch =
+      searchTerm.trim() === '' ||
+      t.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      t.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      t.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      t.branchName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      t.requesterName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      t.assignedToName?.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesBranch && matchesStatus && matchesSearch;
+  });
+
+  const attentionTickets = filteredTickets.filter((t) => t.status === 'In Progress');
+
+  const inProgressCount = attentionTickets.length;
+  const resolvedCount = filteredTickets.filter((t) => t.status === 'Resolved').length;
+  const totalFiltered = filteredTickets.length;
+
+  return (
+    <div className="space-y-6">
+      {/* IT Header Banner */}
+      <div className="bg-slate-900 text-white p-4 sm:p-6 rounded-2xl shadow-lg border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4 p-responsive">
+        <div className="min-w-0">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-semibold mb-3">
+            <ShieldAlert className="w-4 h-4 text-amber-400" />
+            <span>Main IT Department Portal</span>
+          </div>
+          <h1 className="text-fluid-2xl font-extrabold tracking-tight">
+            IT Service Desk Dashboard
+          </h1>
+          <p className="text-sm text-slate-300 mt-1">
+            Real-time branch IT ticket monitoring, triage, and resolution management
+          </p>
+        </div>
+
+        <button type="button"
+          onClick={onNavigateAllTickets}
+          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition shadow-md flex items-center gap-2 cursor-pointer self-start md:self-auto touch-p"
+        >
+          <span>View All IT Queue</span>
+          <ArrowRight className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Metric Cards Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 rounded-2xl bg-white border border-slate-200 shadow-md p-3 sm:p-4">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          whileHover={{ y: -2, transition: { type: "spring", stiffness: 300, damping: 20 } }}
+          transition={{ delay: 0.1, duration: 0.35 }}
+          onClick={() => setStatusFilter('ALL')}
+          className={`p-4 rounded-xl border transition cursor-pointer ${
+            statusFilter === 'ALL'
+              ? 'bg-slate-900 text-white border-slate-800 shadow-md ring-2 ring-emerald-500'
+              : 'bg-white text-slate-900 border-slate-200 hover:border-slate-300'
+          }`}>
+        <div className="text-xs font-bold uppercase tracking-wider flex items-center justify-between text-slate-400">
+          <span>Total Tickets</span>
+          <TicketIcon className="w-4 h-4 text-slate-400" />
+        </div>
+        <div className="flex items-end justify-between gap-2 mt-2">
+          <div className="text-2xl sm:text-3xl font-black tabular-nums text-slate-900">{totalCount}</div>
+          <span className="inline-flex items-center gap-0.5 text-[10px] font-black tracking-tight px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200">100%</span>
+        </div>
+        <div className="text-[11px] mt-1 text-slate-500">All tickets across branches</div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          whileHover={{ y: -2, transition: { type: "spring", stiffness: 300, damping: 20 } }}
+          transition={{ delay: 0.1, duration: 0.35 }}
+          onClick={() => setStatusFilter('In Progress')}
+          className={`p-4 rounded-xl border transition cursor-pointer ${
+            statusFilter === 'In Progress'
+              ? 'bg-amber-900 text-white border-amber-800 shadow-md ring-2 ring-amber-400'
+              : 'bg-amber-50/70 border-amber-200 shadow-sm hover:shadow-md hover:border-amber-300'
+          }`}>
+        <div className="text-[10px] font-bold uppercase tracking-wider flex items-center justify-between text-amber-700">
+          <span>In Progress</span>
+          <PlayCircle className="w-3.5 h-3.5 text-amber-600" />
+        </div>
+        <div className="flex items-center justify-between mt-1">
+          <div className="text-2xl font-black tabular-nums text-amber-900">{inProgressCount}</div>
+          {totalFiltered > 0 && (
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold tabular-nums bg-amber-100 text-amber-700">
+              +{Math.round((inProgressCount / totalFiltered) * 100)}%
+            </span>
+          )}
+        </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          whileHover={{ y: -2, transition: { type: "spring", stiffness: 300, damping: 20 } }}
+          transition={{ delay: 0.3, duration: 0.35 }}
+          onClick={() => setStatusFilter('Resolved')}
+          className={`p-4 rounded-xl border transition cursor-pointer ${
+            statusFilter === 'Resolved'
+              ? 'bg-emerald-900 text-white border-emerald-800 shadow-md ring-2 ring-emerald-400'
+              : 'bg-emerald-50/70 border-emerald-200 shadow-sm hover:shadow-md hover:border-emerald-300'
+          }`}>
+        <div className="text-[10px] font-bold uppercase tracking-wider flex items-center justify-between text-emerald-700">
+          <span>Resolved</span>
+          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+        </div>
+        <div className="flex items-center justify-between mt-1">
+          <div className="text-2xl font-black tabular-nums text-emerald-900">{resolvedCount}</div>
+          {totalFiltered > 0 && (
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold tabular-nums bg-emerald-100 text-emerald-700">
+              +{Math.round((resolvedCount / totalFiltered) * 100)}%
+            </span>
+          )}
+        </div>
+        </motion.div>
+      </div>
+
+      {/* Tickets Requiring IT Attention */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="p-4 sm:p-6 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50/60">
+          <div className="min-w-0">
+            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-amber-600" />
+              <span>Tickets Requiring IT Attention</span>
+            </h3>
+            <p className="text-xs text-slate-500">
+              Active tickets needing triage, assignment, or resolution
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 min-w-0 gap-responsive-x">
+            <Filter className="w-4 h-4 text-slate-400 shrink-0" />
+            <select
+              value={branchFilter}
+              onChange={(e) => setBranchFilter(e.target.value)}
+              className="px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-xl text-slate-800 font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-600 min-w-[140px] shrink-0"
+            >
+              <option value="ALL">All Branches</option>
+              {branchesList.map((b) => (
+                <option key={b} value={b}>
+                  {b}
+                </option>
+              ))}
+            </select>
+            <Filter className="w-4 h-4 text-slate-400 shrink-0" />
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-xl text-slate-800 font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-600 min-w-[120px] shrink-0"
+            >
+              <option value="ALL">All Statuses</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Resolved">Resolved</option>
+            </select>
+            <input
+              type="text"
+              placeholder="Search tickets..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="flex-1 min-w-[150px] pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-600"
+              
+            />
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+        </div>
+
+        {attentionTickets.length === 0 ? (
+          <div className="p-8 text-center text-slate-400 text-xs">
+            <ShieldAlert className="w-12 h-12 mx-auto mb-2 text-slate-300" />
+            <p className="text-sm font-medium text-slate-500">No IT tickets require attention at this time.</p>
+          </div>
+        ) : (
+          <>
+            {/* Mobile card list */}
+            <div className="md:hidden divide-y divide-slate-100">
+              {attentionTickets.map((ticket) => (
+                <MobileTicketCard
+                  key={ticket.id}
+                  ticket={{
+                    id: ticket.id,
+                    subject: ticket.subject,
+                    description: ticket.description,
+                    status: ticket.status,
+                    priority: ticket.priority,
+                    category: ticket.category,
+                    subcategory: ticket.subcategory,
+                    branch: ticket.branchName,
+                    reporter: { name: ticket.requesterName },
+                    assignee: ticket.assignedToName
+                      ? { name: ticket.assignedToName, id: ticket.assignedToId ?? '' }
+                      : undefined,
+                    createdAt: ticket.createdAt,
+                    createdAtISO: ticket.createdAtISO,
+                    slaDeadline: ticket.slaDeadline,
+                  }}
+                  onClick={() => onNavigateTicketDetail(ticket.id)}
+                />
+              ))}
+            </div>
+
+            {/* Desktop table */}
+            <div className="hidden md:block overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-100 text-slate-700 font-bold uppercase tracking-wider border-b border-slate-200">
+                <tr>
+                  <th className="py-3 px-4">Ticket #</th>
+                  <th className="py-3 px-4">Branch</th>
+                  <th className="py-3 px-4">Subject</th>
+                  <th className="py-3 px-4">Category</th>
+                  <th className="py-3 px-4">Status</th>
+                  <th className="py-3 px-4">Assigned To</th>
+                  <th className="py-3 px-4">Requester</th>
+                  <th className="py-3 px-4">Submitted</th>
+                  <th className="py-3 px-4 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {attentionTickets.map((ticket, i) => (
+                  <motion.tr
+                    key={ticket.id}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 + i * 0.03, duration: 0.25 }}
+                    onClick={() => onNavigateTicketDetail(ticket.id)}
+                    className={`border-l-4 transition cursor-pointer group hover:bg-slate-50 ${
+                      ticket.status === 'Resolved'
+                        ? 'border-l-emerald-400'
+                        : 'border-l-amber-400'
+                    }`}>
+                  <td className="py-3 px-4 font-mono font-bold text-emerald-900 group-hover:underline">
+                    #{ticket.id}
+                  </td>
+                  <td className="py-3 px-4 font-bold text-slate-800 whitespace-nowrap">
+                    {ticket.branchName}
+                  </td>
+                  <td className="py-3 px-4 max-w-xs truncate font-medium text-slate-900">
+                    {ticket.subject}
+                  </td>
+                  <td className="py-3 px-4 text-slate-600">{ticket.category}</td>
+                  <td className="py-3 px-4">
+                    <StatusBadge status={ticket.status} size="sm" />
+                  </td>
+                  <td className="py-3 px-4 text-slate-700 whitespace-nowrap">
+                    {ticket.assignedToName || (
+                      <span className="text-amber-700 font-semibold italic">Unassigned</span>
+                    )}
+                  </td>
+                  <td className="py-3 px-4 text-slate-500 whitespace-nowrap">
+                    {ticket.requesterName}
+                  </td>
+                  <td className="py-3 px-4 text-slate-500 whitespace-nowrap">
+                    {ticket.createdAt}
+                  </td>
+                  <td className="py-3 px-4 text-right whitespace-nowrap">
+                    <button type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onNavigateTicketDetail(ticket.id);
+                      }}
+                      className="px-2.5 py-1 rounded bg-emerald-900 text-white hover:bg-emerald-800 font-bold transition inline-flex items-center gap-1 cursor-pointer"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Manage</span>
+                    </button>
+                  </td>
+                </motion.tr>
+              ))}
+              </tbody>
+            </table>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default ItDashboardView;

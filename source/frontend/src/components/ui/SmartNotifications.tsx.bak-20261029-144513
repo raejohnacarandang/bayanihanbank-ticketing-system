@@ -1,0 +1,426 @@
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { useFeatureFlag } from '../hooks/useFeatureFlags';
+import { 
+  Bell, 
+  CheckCircle2, 
+  AlertCircle, 
+  AlertTriangle, 
+  Info, 
+  X, 
+  Filter, 
+  ChevronDown,
+  Check,
+  Clock,
+  MessageSquare,
+  ShieldCheck,
+  Building2,
+  Zap,
+  Clock as ClockIcon
+} from 'lucide-react';
+
+interface SmartNotification {
+  id: string;
+  type: 'info' | 'success' | 'warning' | 'error';
+  title: string;
+  message: string;
+  timestamp: string;
+  read: boolean;
+  category: 'ticket' | 'branch' | 'system' | 'assignment' | 'mention' | 'general';
+  priority: 'low' | 'normal' | 'high' | 'critical';
+  ticketId?: string;
+  branchId?: string;
+  action?: {
+    label: string;
+    onClick: () => void;
+  };
+  groupedWith?: string[];
+}
+
+interface SmartNotificationCenterProps {
+  notifications: SmartNotification[];
+  onMarkRead: (id: string) => void;
+  onMarkAllRead: () => void;
+  onNavigateTicket?: (ticketId: string) => void;
+  onNavigateBranch?: (branchId: string) => void;
+  onClose?: () => void;
+}
+
+const categoryStyles: Record<string, { icon: React.ReactNode; bg: string; text: string; border: string }> = {
+  ticket: { 
+    icon: <MessageSquare className="w-5 h-5" />, 
+    bg: 'bg-sky-50', 
+    text: 'text-sky-700', 
+    border: 'border-sky-200' 
+  },
+  branch: { 
+    icon: <Building2 className="w-5 h-5" />, 
+    bg: 'bg-emerald-50', 
+    text: 'text-emerald-700', 
+    border: 'border-emerald-200' 
+  },
+  system: { 
+    icon: <Zap className="w-5 h-5" />, 
+    bg: 'bg-amber-50', 
+    text: 'text-amber-700', 
+    border: 'border-amber-200' 
+  },
+  assignment: { 
+    icon: <ShieldCheck className="w-5 h-5" />, 
+    bg: 'bg-purple-50', 
+    text: 'text-purple-700', 
+    border: 'border-purple-200' 
+  },
+  mention: { 
+    icon: <Zap className="w-5 h-5" />, 
+    bg: 'bg-rose-50', 
+    text: 'text-rose-700', 
+    border: 'border-rose-200' 
+  },
+  general: { 
+    icon: <Bell className="w-5 h-5" />, 
+    bg: 'bg-slate-50', 
+    text: 'text-slate-700', 
+    border: 'border-slate-200' 
+  },
+};
+
+const priorityStyles: Record<string, { bg: string; text: string; border: string }> = {
+  low: { bg: 'bg-slate-100', text: 'text-slate-600', border: 'border-slate-200' },
+  normal: { bg: 'bg-sky-100', text: 'text-sky-600', border: 'border-sky-200' },
+  high: { bg: 'bg-amber-100', text: 'text-amber-700', border: 'border-amber-200' },
+  critical: { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-200' },
+};
+
+export function SmartNotificationCenter({
+  notifications,
+  onMarkRead,
+  onMarkAllRead,
+  onNavigateTicket,
+  onNavigateBranch,
+  onClose,
+}: SmartNotificationCenterProps) {
+  const enabled = useFeatureFlag('smart-notifications');
+  const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [filterPriority, setFilterPriority] = useState<string>('all');
+  const [showOnlyUnread, setShowOnlyUnread] = useState(false);
+  const [groupByCategory, setGroupByCategory] = useState(true);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['all']));
+
+  if (!enabled) return null;
+
+  const filteredNotifications = useMemo(() => {
+    return notifications.filter(n => {
+      if (showOnlyUnread && n.read) return false;
+      if (filterCategory !== 'all' && n.category !== filterCategory) return false;
+      if (filterPriority !== 'all' && n.priority !== filterPriority) return false;
+      return true;
+    });
+  }, [notifications, showOnlyUnread, filterCategory, filterPriority]);
+
+  const groupedNotifications = useMemo(() => {
+    if (!groupByCategory) return { all: notifications };
+    
+    return filteredNotifications.reduce((acc, n) => {
+      const key = n.category;
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(n);
+      return acc;
+    }, {} as Record<string, typeof notifications>);
+  }, [filteredNotifications, groupByCategory]);
+
+  const unreadCount = notifications.filter(n => !n.read).length;
+  const categories = useMemo(() => 
+    Array.from(new Set(notifications.map(n => n.category))).sort(),
+  [notifications]);
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      {/* Header */}
+      <div className="p-4 sm:p-5 border-b border-slate-200 bg-slate-50/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-sky-100 flex items-center justify-center">
+            <Bell className="w-5 h-5 text-sky-600" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-slate-900">Smart Notifications</h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {notifications.length} total · {unreadCount} unread
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={showOnlyUnread}
+              onChange={e => setShowOnlyUnread(e.target.checked)}
+              id="show-unread"
+              className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-2 focus:ring-emerald-500"
+            />
+            <label htmlFor="show-unread" className="text-xs font-medium text-slate-600">Unread only</label>
+          </div>
+
+          <div className="flex items-center gap-1">
+            <button type="button"
+              onClick={() => setGroupByCategory(!groupByCategory)}
+              className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg transition ${
+                groupByCategory ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              Group by Category
+            </button>
+          </div>
+
+          <div className="relative">
+            <Filter className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <select
+              value={filterCategory}
+              onChange={e => setFilterCategory(e.target.value)}
+              className="pl-8 pr-3 py-1.5 w-36 sm:w-40 rounded-lg border border-slate-200 bg-slate-50 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-400"
+            >
+              <option value="all">All Categories</option>
+              <option value="ticket">Tickets</option>
+              <option value="branch">Branch Systems</option>
+              <option value="system">System Alerts</option>
+              <option value="assignment">Assignments</option>
+              <option value="mention">Mentions</option>
+              <option value="general">General</option>
+            </select>
+          </div>
+
+          <div className="relative">
+            <select
+              value={filterPriority}
+              onChange={e => setFilterPriority(e.target.value)}
+              className="pl-3 pr-8 py-1.5 w-28 rounded-lg border border-slate-200 bg-slate-50 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-400"
+            >
+              <option value="all">All Priority</option>
+              <option value="critical">Critical</option>
+              <option value="high">High</option>
+              <option value="normal">Normal</option>
+              <option value="low">Low</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Notification List */}
+      <div className="max-h-[70vh] overflow-y-auto divide-y divide-slate-100">
+        {groupByCategory ? (
+          Object.entries(groupedNotifications).map(([category, notifs]) => (
+            <NotificationGroup
+              key={category}
+              category={category}
+              notifications={notifs}
+              onMarkRead={onMarkRead}
+              onNavigateTicket={onNavigateTicket}
+              onNavigateBranch={onNavigateBranch}
+              expandedGroups={expandedGroups}
+              setExpandedGroups={setExpandedGroups}
+            />
+          ))
+        ) : (
+          <div className="p-4">
+            {notifications.length === 0 ? (
+              <div className="p-8 text-center text-slate-400">
+                <Bell className="w-10 h-10 mx-auto mb-2 text-slate-300" />
+                <p className="text-sm font-medium text-slate-500">No notifications match your filters</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {notifications.map(n => (
+                  <SmartNotificationItem
+                    key={n.id}
+                    notification={n}
+                    onMarkRead={onMarkRead}
+                    onNavigateTicket={onNavigateTicket}
+                    onNavigateBranch={onNavigateBranch}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Footer Actions */}
+      {unreadCount > 0 && (
+        <div className="p-3 sm:p-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
+          <span className="text-[11px] text-slate-500 font-medium">
+            {unreadCount} unread notification{unreadCount !== 1 ? 's' : ''}
+          </span>
+          <div className="flex items-center gap-2">
+            <button type="button"
+              onClick={onMarkAllRead}
+              className="px-3 py-1.5 text-xs font-bold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition"
+            >
+              Mark all as read
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NotificationGroup({
+  category,
+  notifications,
+  onMarkRead,
+  onNavigateTicket,
+  onNavigateBranch,
+  expandedGroups,
+  setExpandedGroups,
+}: {
+  category: string;
+  notifications: any[];
+  onMarkRead: (id: string) => void;
+  onNavigateTicket?: (id: string) => void;
+  onNavigateBranch?: (id: string) => void;
+  expandedGroups: Set<string>;
+  setExpandedGroups: React.Dispatch<React.SetStateAction<Set<string>>>;
+}) {
+  const isExpanded = expandedGroups.has(category);
+  const categoryStyles = {
+    ticket: { icon: <MessageSquare className="w-4 h-4" />, bg: 'bg-sky-50', text: 'text-sky-700', border: 'border-sky-200' },
+    branch: { icon: <Building2 className="w-4 h-4" />, bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
+    system: { icon: <Zap className="w-4 h-4" />, bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
+    assignment: { icon: <ShieldCheck className="w-4 h-4" />, bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200' },
+    mention: { icon: <Zap className="w-4 h-4" />, bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200' },
+    general: { icon: <Bell className="w-4 h-4" />, bg: 'bg-slate-50', text: 'text-slate-700', border: 'border-slate-200' },
+  };
+
+  const styles = categoryStyles[category as keyof typeof categoryStyles] || categoryStyles.general;
+
+  const handleToggle = () => {
+    setExpandedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(category)) next.delete(category);
+      else next.add(category);
+      return next;
+    });
+  };
+
+  return (
+    <div className="border-b border-slate-100">
+      <button type="button"
+        onClick={handleToggle}
+        className="w-full px-4 py-3 bg-slate-50/50 flex items-center gap-3 text-left"
+      >
+        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${styles.bg}`}>
+          {styles.icon}
+        </div>
+        <div className="flex-1 min-w-0">
+          <span className="font-semibold text-slate-900 capitalize">{category}</span>
+          <span className="text-[10px] text-slate-400 ml-2">{notifications.length} notification{notifications.length !== 1 ? 's' : ''}</span>
+        </div>
+        <ChevronDown className={`w-4 h-4 text-slate-400 transition ${isExpanded ? 'rotate-180' : ''}`} />
+      </button>
+    </div>
+  )}
+
+export function SmartNotificationItem({
+  notification,
+  onMarkRead,
+  onNavigateTicket,
+  onNavigateBranch,
+}: {
+  notification: any;
+  onMarkRead: (id: string) => void;
+  onNavigateTicket?: (id: string) => void;
+  onNavigateBranch?: (id: string) => void;
+}) {
+  const categoryStyles = {
+    ticket: { icon: <MessageSquare className="w-4 h-4" />, bg: 'bg-sky-50', text: 'text-sky-700', border: 'border-sky-200' },
+    branch: { icon: <Building2 className="w-4 h-4" />, bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
+    system: { icon: <Zap className="w-4 h-4" />, bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
+    assignment: { icon: <ShieldCheck className="w-4 h-4" />, bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200' },
+    mention: { icon: <Zap className="w-4 h-4" />, bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200' },
+    general: { icon: <Bell className="w-4 h-4" />, bg: 'bg-slate-50', text: 'text-slate-700', border: 'border-slate-200' },
+  };
+
+  const priorityStyles = {
+    low: { bg: 'bg-slate-100', text: 'text-slate-600', border: 'border-slate-200' },
+    normal: { bg: 'bg-sky-100', text: 'text-sky-600', border: 'border-sky-200' },
+    high: { bg: 'bg-amber-100', text: 'text-amber-700', border: 'border-amber-200' },
+    critical: { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-200' },
+  };
+
+  const catStyles = categoryStyles[notification.category] || categoryStyles.general;
+  const priStyles = priorityStyles[notification.priority] || priorityStyles.normal;
+
+  return (
+    <motion.div
+      key={notification.id}
+      initial={{ opacity: 0, x: -20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 20 }}
+      className={`p-4 hover:bg-slate-50/50 transition ${!notification.read ? 'bg-sky-50/50' : ''}`}
+    >
+      <div className="flex items-start gap-3">
+        <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${catStyles.bg}`}>
+          {catStyles.icon}
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h4 className={`font-semibold text-slate-900 ${!notification.read ? 'text-sky-900' : ''}`}>
+                {notification.title}
+              </h4>
+              {!notification.read && (
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-600 text-white uppercase tracking-wider">
+                  New
+                </span>
+              )}
+              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${priStyles.bg} ${priStyles.text} ${priStyles.border}`}>
+                {notification.priority}
+              </span>
+            </div>
+            <span className="text-[10px] text-slate-400 shrink-0">{notification.timestamp}</span>
+          </div>
+          <p className="text-xs text-slate-600 mt-1">{notification.message}</p>
+          <div className="flex items-center gap-2 mt-2 flex-wrap">
+            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${catStyles.bg} ${catStyles.text} ${catStyles.border}`}>
+              {notification.category}
+            </span>
+            {notification.ticketId && onNavigateTicket && (
+              <button type="button"
+                onClick={() => onNavigateTicket!(notification.ticketId!)}
+                className="text-xs text-sky-600 hover:underline font-medium"
+              >
+                View Ticket
+              </button>
+            )}
+            {notification.branchId && onNavigateBranch && (
+              <button type="button"
+                onClick={() => onNavigateBranch!(notification.branchId!)}
+                className="text-xs text-emerald-600 hover:underline font-medium"
+              >
+                View Branch
+              </button>
+            )}
+            {notification.action && (
+              <button type="button"
+                onClick={notification.action.onClick}
+                className="text-xs text-emerald-600 hover:underline font-medium"
+              >
+                {notification.action.label}
+              </button>
+            )}
+          </div>
+        </div>
+
+        <button type="button"
+          onClick={() => onMarkRead(notification.id)}
+          className={`p-1.5 rounded-lg transition ${!notification.read ? 'bg-sky-50 text-sky-600' : 'text-slate-400 hover:text-sky-600 hover:bg-sky-50'}`}
+          aria-label={notification.read ? 'Mark as unread' : 'Mark as read'}
+        >
+          <Check className="w-4 h-4" />
+        </button>
+      </div>
+    </motion.div>
+  );
+}

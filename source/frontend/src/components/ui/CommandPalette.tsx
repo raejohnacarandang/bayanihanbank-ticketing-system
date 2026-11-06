@@ -1,0 +1,353 @@
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { 
+  Search, 
+  Keyboard, 
+  Ticket, 
+  Building2, 
+  Users, 
+  FileText, 
+  Settings, 
+  Plus, 
+  ExternalLink,
+  Clock,
+  ShieldCheck,
+  MessageSquare,
+  BarChart3,
+  Zap
+} from 'lucide-react';
+
+interface CommandItem {
+  id: string;
+  label: string;
+  description?: string;
+  icon?: React.ReactNode;
+  category: string;
+  keywords: string[];
+  action: () => void;
+  shortcut?: string;
+}
+
+interface CommandPaletteProps {
+  isOpen: boolean;
+  onClose: () => void;
+  items?: CommandItem[];
+  onSearch?: (query: string) => void;
+}
+
+const defaultItems: CommandItem[] = [
+  {
+    id: 'new-ticket',
+    label: 'Create New Ticket',
+    description: 'Submit a new IT request',
+    icon: <Plus className="w-4 h-4" />,
+    category: 'Tickets',
+    keywords: ['new', 'create', 'ticket', 'request'],
+    action: () => window.location.href = '/tickets/new',
+    shortcut: 'N',
+  },
+  {
+    id: 'my-tickets',
+    label: 'My Tickets',
+    description: 'View your submitted tickets',
+    icon: <Ticket className="w-4 h-4" />,
+    category: 'Tickets',
+    keywords: ['my', 'tickets', 'requests'],
+    action: () => window.location.href = '/my_tickets',
+    shortcut: 'M',
+  },
+  {
+    id: 'all-tickets',
+    label: 'All Tickets',
+    description: 'View all tickets (Admin)',
+    icon: <Ticket className="w-4 h-4" />,
+    category: 'Tickets',
+    keywords: ['all', 'tickets', 'admin'],
+    action: () => window.location.href = '/tickets',
+    shortcut: 'A',
+  },
+  {
+    id: 'branch-monitor',
+    label: 'Branch Monitor',
+    description: 'View branch system health',
+    icon: <Building2 className="w-4 h-4" />,
+    category: 'Monitoring',
+    keywords: ['branch', 'monitor', 'health', 'systems'],
+    action: () => window.location.href = '/monitor',
+    shortcut: 'B',
+  },
+  {
+    id: 'users',
+    label: 'User Management',
+    description: 'Manage users and roles',
+    icon: <Users className="w-4 h-4" />,
+    category: 'Admin',
+    keywords: ['users', 'management', 'admin', 'roles'],
+    action: () => { /* navigate to users */ },
+    shortcut: 'U',
+  },
+  {
+    id: 'reports',
+    label: 'Reports & Analytics',
+    description: 'View reports and analytics',
+    icon: <FileText className="w-4 h-4" />,
+    category: 'Reports',
+    keywords: ['reports', 'analytics', 'dashboard'],
+    action: () => window.location.href = '/reports',
+    shortcut: 'R',
+  },
+  {
+    id: 'notifications',
+    label: 'Notifications',
+    description: 'View all notifications',
+    icon: <Clock className="w-4 h-4" />,
+    category: 'General',
+    keywords: ['notifications', 'alerts', 'notif'],
+    action: () => window.location.href = '/notifications',
+    shortcut: 'I',
+  },
+  {
+    id: 'help',
+    label: 'Help Center',
+    description: 'View help documentation',
+    icon: <ShieldCheck className="w-4 h-4" />,
+    category: 'Help',
+    keywords: ['help', 'support', 'documentation'],
+    action: () => window.location.href = '/help',
+    shortcut: 'H',
+  },
+  {
+    id: 'knowledge-base',
+    label: 'Knowledge Base',
+    description: 'Search knowledge base articles',
+    icon: <MessageSquare className="w-4 h-4" />,
+    category: 'Help',
+    keywords: ['knowledge', 'base', 'articles', 'kb'],
+    action: () => window.location.href = '/knowledge-base',
+    shortcut: 'K',
+  },
+];
+
+export function CommandPalette({ 
+  isOpen, 
+  onClose, 
+  items = defaultItems,
+  onSearch 
+}: CommandPaletteProps) {
+  const [query, setQuery] = useState('');
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  const filteredItems = useMemo(() => {
+    if (!query.trim()) return items;
+    
+    const searchTerms = query.toLowerCase().split(' ').filter(Boolean);
+    
+    return items
+      .map(item => {
+        const searchableText = [
+          item.label,
+          item.description || '',
+          item.category,
+          ...item.keywords,
+          item.shortcut || ''
+        ].join(' ').toLowerCase();
+        
+        const matches = searchTerms.every(term => searchableText.includes(term));
+        return matches ? { item, score: searchableText.length } : null;
+      })
+      .filter((x): x is { item: CommandItem; score: number } => x !== null)
+      .sort((a, b) => a.score - b.score)
+      .map(x => x.item);
+  }, [query, items]);
+
+  useEffect(() => {
+    if (isOpen) {
+      setQuery('');
+      setSelectedIndex(0);
+      inputRef.current?.focus();
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [query, filteredItems.length]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedIndex(i => Math.min(i + 1, filteredItems.length - 1));
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedIndex(i => Math.max(i - 1, 0));
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (filteredItems[selectedIndex]) {
+          filteredItems[selectedIndex].action();
+          onClose();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, filteredItems, selectedIndex, onClose]);
+
+  useEffect(() => {
+    const element = listRef.current?.querySelector(`[data-index="${selectedIndex}"]`);
+    element?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [selectedIndex]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setQuery(e.target.value);
+    onSearch?.(e.target.value);
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-50 flex items-start justify-center pt-20"
+        onClick={onClose}
+      >
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95, y: -20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: -20 }}
+          transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+          className="w-full max-w-2xl mx-4 bg-white rounded-2xl shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)] border border-slate-200 overflow-hidden"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Command Palette"
+        >
+          <div className="p-4 border-b border-slate-100">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+              <kbd className="absolute right-3 top-1/2 -translate-y-1/2 px-2 py-0.5 text-[10px] font-mono text-slate-400 bg-slate-100 rounded">
+                <Keyboard className="w-3 h-3 inline-block mr-1" /> K
+              </kbd>
+              <input
+                ref={inputRef}
+                type="text"
+                value={query}
+                onChange={handleInputChange}
+                placeholder="Type a command or search..."
+                className="w-full pl-10 pr-16 py-3 bg-slate-50 border border-slate-200 rounded-xl text-base text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                autoComplete="off"
+                spellCheck={false}
+                aria-label="Search commands"
+              />
+            </div>
+          </div>
+
+          <AnimatePresence mode="popLayout">
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="max-h-[60vh] overflow-y-auto"
+            >
+              {filteredItems.length > 0 ? (
+                <div className="divide-y divide-slate-100" ref={listRef}>
+                  {filteredItems.map((item, index) => (
+                    <motion.button type="button"
+                      key={item.id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.02 * index, duration: 0.15 }}
+                      onClick={() => { item.action(); onClose(); }}
+                      className={`
+                        w-full px-4 py-3.5 text-left flex items-center gap-3
+                        transition-colors duration-150
+                        ${index === selectedIndex 
+                          ? 'bg-emerald-50 border-l-4 border-emerald-500' 
+                          : 'hover:bg-slate-50'
+                        }
+                      `}
+                      data-index={index}
+                      role="option"
+                      aria-selected={index === selectedIndex}
+                    >
+                      <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500">
+                        {item.icon}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-slate-900 truncate">{item.label}</span>
+                          {item.shortcut && (
+                            <kbd className="px-1.5 py-0.5 text-[10px] font-mono text-slate-400 bg-slate-100 rounded">
+                              {item.shortcut}
+                            </kbd>
+                          )}
+                        </div>
+                        {item.description && (
+                          <p className="text-sm text-slate-500 mt-0.5 truncate">{item.description}</p>
+                        )}
+                        <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{item.category}</span>
+                      </div>
+                    </motion.button>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-8 text-center text-slate-500">
+                  <Search className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                  <p className="text-sm font-medium">No commands found</p>
+                  <p className="text-xs text-slate-400 mt-1">Try a different search term</p>
+                </div>
+              )}
+            </motion.div>
+          </AnimatePresence>
+
+          <div className="p-3 border-t border-slate-100 bg-slate-50/50">
+            <p className="text-[11px] text-slate-500 text-center">
+              <kbd className="px-1.5 py-0.5 text-[10px] font-mono text-slate-400 bg-slate-100 rounded">↑</kbd>
+              <kbd className="px-1.5 py-0.5 text-[10px] font-mono text-slate-400 bg-slate-100 rounded">↓</kbd>
+              Navigate · 
+              <kbd className="px-1.5 py-0.5 text-[10px] font-mono text-slate-400 bg-slate-100 rounded">Enter</kbd>
+              Select · 
+              <kbd className="px-1.5 py-0.5 text-[10px] font-mono text-slate-400 bg-slate-100 rounded">Esc</kbd>
+              Close
+            </p>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
+export function useCommandPalette() {
+  const [isOpen, setIsOpen] = useState(false);
+  const [items, setItems] = useState<CommandItem[]>(defaultItems);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        setIsOpen(true);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  const addItems = useCallback((newItems: CommandItem[]) => {
+    setItems(prev => [...prev, ...newItems]);
+  }, []);
+
+  const removeItems = useCallback((ids: string[]) => {
+    setItems(prev => prev.filter(item => !ids.includes(item.id)));
+  }, []);
+
+  return { isOpen, setIsOpen, items, addItems, removeItems };
+}

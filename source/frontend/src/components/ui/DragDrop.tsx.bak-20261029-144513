@@ -1,0 +1,351 @@
+import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { 
+  GripVertical, 
+  Check, 
+  Trash2, 
+  Edit, 
+  MoreVertical,
+  User,
+  Calendar,
+  Flag,
+  ChevronDown
+} from 'lucide-react';
+import { useFeatureFlag } from '../hooks/useFeatureFlags';
+
+interface DraggableItem<T> {
+  id: string;
+  data: T;
+  selected?: boolean;
+}
+
+interface DragDropProps<T> {
+  items: DraggableItem<T>[];
+  onReorder: (items: DraggableItem<T>[]) => void;
+  onSelectionChange?: (selectedIds: string[]) => void;
+  renderItem: (item: DraggableItem<T>, dragHandle: React.ReactNode, isSelected: boolean) => React.ReactNode;
+  renderDragPreview?: (item: DraggableItem<T>) => React.ReactNode;
+  groupId?: string;
+  disabled?: boolean;
+}
+
+export function DragDropList<T>({
+  items,
+  onReorder,
+  onSelectionChange,
+  renderItem,
+  groupId = 'default',
+  disabled = false,
+}: DragDropProps<T>) {
+  const enabled = useFeatureFlag('drag-drop');
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const dragOverId = useRef<string | null>(null);
+  const dragStartPos = useRef({ x: 0, y: 0 });
+
+  const isEnabled = enabled && !disabled;
+
+  const handleDragStart = (e: React.DragEvent, id: string) => {
+    if (!isEnabled) return;
+    setDraggedId(id);
+    dragStartPos.current = { x: e.clientX, y: e.clientY };
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', id);
+    
+    const preview = document.createElement('div');
+    preview.style.position = 'absolute';
+    preview.style.top = '-1000px';
+    document.body.appendChild(preview);
+    e.dataTransfer.setDragImage(preview, 0, 0);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedId(null);
+    dragOverId.current = null;
+  };
+
+  const handleDragOver = (e: React.DragEvent, targetId: string) => {
+    if (!isEnabled || draggedId === targetId) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    dragOverId.current = targetId;
+  };
+
+  const handleDrop = (e: React.DragEvent, targetId: string) => {
+    if (!isEnabled || !draggedId || draggedId === targetId) return;
+    e.preventDefault();
+
+    const newItems = [...items];
+    const fromIndex = newItems.findIndex(item => item.id === draggedId);
+    const toIndex = newItems.findIndex(item => item.id === targetId);
+
+    if (fromIndex !== -1 && toIndex !== -1) {
+      const [removed] = newItems.splice(fromIndex, 1);
+      newItems.splice(toIndex, 0, removed);
+      onReorder(newItems);
+    }
+
+    setDraggedId(null);
+    dragOverId.current = null;
+  };
+
+  const handleSelect = (id: string, multiSelect = false) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (multiSelect) {
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+      } else {
+        next.clear();
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (selectedIds.size === items.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(items.map(i => i.id)));
+    }
+  };
+
+  const handleBulkDelete = () => {
+    const newItems = items.filter(item => !selectedIds.has(item.id));
+    onReorder(newItems);
+    setSelectedIds(new Set());
+  };
+
+  useEffect(() => {
+    onSelectionChange?.(Array.from(selectedIds));
+  }, [selectedIds, onSelectionChange]);
+
+  return (
+    <div className="space-y-2" role="list" aria-label="Draggable list">
+      {selectedIds.size > 0 && (
+        <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between">
+          <span className="text-sm font-medium text-amber-800">
+            {selectedIds.size} item{selectedIds.size !== 1 ? 's' : ''} selected
+          </span>
+          <div className="flex gap-2">
+            <button type="button"
+              onClick={() => setSelectedIds(new Set())}
+              className="text-sm text-amber-700 hover:text-amber-900 font-medium"
+            >
+              Clear selection
+            </button>
+            <button type="button"
+              onClick={handleBulkDelete}
+              className="px-3 py-1.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition"
+            >
+              <Trash2 className="w-4 h-4 inline mr-1" />
+              Delete selected
+            </button>
+          </div>
+        </div>
+      )}
+
+      <AnimatePresence>
+        {items.map((item, index) => (
+          <motion.div
+            key={item.id}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ delay: index * 0.03, duration: 0.2 }}
+            className="relative"
+          >
+            <div
+              className={`
+                group relative rounded-xl border transition-all duration-200
+                ${selectedIds.has(item.id) 
+                  ? 'bg-emerald-50 border-emerald-200 ring-2 ring-emerald-500/20' 
+                  : 'bg-white border-slate-200 hover:bg-slate-50'
+                }
+              `}
+              draggable={isEnabled}
+              onDragStart={e => handleDragStart(e, item.id)}
+              onDragEnd={handleDragEnd}
+              onDragOver={e => handleDragOver(e, item.id)}
+              onDrop={e => handleDrop(e, item.id)}
+              role="listitem"
+              aria-selected={selectedIds.has(item.id)}
+              aria-grabbed={draggedId === item.id}
+            >
+              <div className="absolute inset-0 bg-emerald-50/50 opacity-0 group-hover:opacity-100 transition-opacity" />
+              
+              <div className="relative p-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(item.id)}
+                      onChange={e => handleSelect(item.id, true)}
+                      onClick={e => e.stopPropagation()}
+                      className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-2 focus:ring-emerald-500"
+                      aria-label="Select item"
+                    />
+                    
+                    {isEnabled && (
+                      <button type="button"
+                        className="p-1.5 text-slate-300 hover:text-emerald-600 transition opacity-0 group-hover:opacity-100"
+                        onMouseDown={e => e.preventDefault()}
+                        onDragStart={e => handleDragStart(e, item.id)}
+                        onDragEnd={handleDragEnd}
+                        draggable
+                        aria-label="Drag to reorder"
+                        tabIndex={-1}
+                      >
+                        <GripVertical className="w-5 h-5" />
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex-1 min-w-0" onClick={() => handleSelect(item.id, false)}>
+                    {renderItem(item, (
+                      <GripVertical className="w-5 h-5 text-slate-300" />
+                    ), selectedIds.has(item.id))}
+                  </div>
+                </div>
+              </div>
+
+              {draggedId === item.id && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  className="absolute inset-0 bg-emerald-100/50 rounded-xl border-2 border-emerald-500 pointer-events-none z-10"
+                />
+              )}
+            </div>
+          </motion.div>
+        ))}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+interface BulkActionBarProps {
+  selectedCount: number;
+  onDelete?: () => void;
+  onArchive?: () => void;
+  onAssign?: () => void;
+  onExport?: () => void;
+  customActions?: { label: string; onClick: () => void; icon?: React.ReactNode; variant?: 'primary' | 'secondary' | 'danger' }[];
+}
+
+export function BulkActionBar({ 
+  selectedCount, 
+  onDelete, 
+  onArchive, 
+  onAssign, 
+  onExport,
+  customActions = []
+}: BulkActionBarProps) {
+  if (selectedCount === 0) return null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 w-full max-w-4xl px-4"
+    >
+      <div className="bg-white rounded-2xl shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)] border border-slate-200 p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-medium text-slate-700">
+            {selectedCount} item{selectedCount !== 1 ? 's' : ''} selected
+          </span>
+          <span className="px-2 py-1 text-xs font-semibold bg-amber-100 text-amber-800 rounded-full">
+            Bulk Actions
+          </span>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {onArchive && (
+            <button type="button"
+              onClick={onArchive}
+              className="px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-lg transition"
+            >
+              Archive
+            </button>
+          )}
+          
+          {onAssign && (
+            <button type="button"
+              onClick={onAssign}
+              className="px-3 py-2 text-sm font-medium text-emerald-600 hover:bg-emerald-50 rounded-lg transition"
+            >
+              Assign
+            </button>
+          )}
+          
+          {onExport && (
+            <button type="button"
+              onClick={onExport}
+              className="px-3 py-2 text-sm font-medium text-sky-600 hover:bg-sky-50 rounded-lg transition"
+            >
+              Export
+            </button>
+          )}
+
+          {customActions.map((action, i) => (
+            <button type="button"
+              key={i}
+              onClick={action.onClick}
+              className={`
+                px-3 py-2 text-sm font-medium rounded-lg transition
+                ${action.variant === 'primary' ? 'bg-emerald-600 text-white hover:bg-emerald-700' : ''}
+                ${action.variant === 'secondary' ? 'bg-slate-100 text-slate-700 hover:bg-slate-200' : ''}
+                ${action.variant === 'danger' ? 'bg-red-600 text-white hover:bg-red-700' : ''}
+              `}
+            >
+              {action.icon && <span className="mr-1">{action.icon}</span>}
+              {action.label}
+            </button>
+          ))}
+
+          <button type="button"
+            onClick={() => {}}
+            className="px-3 py-2 text-sm font-medium text-slate-500 hover:text-slate-700"
+          >
+            Clear
+          </button>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+export function useBulkActions<T>(items: { id: string }[]) {
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const selectAll = useCallback(() => {
+    // Would need all items passed in
+  }, []);
+
+  const clearSelection = useCallback(() => {
+    setSelectedIds(new Set());
+  }, []);
+
+  const isSelected = useCallback((id: string) => selectedIds.has(id), [selectedIds]);
+
+  return {
+    selectedIds,
+    selectedCount: selectedIds.size,
+    toggleSelect,
+    selectAll,
+    clearSelection,
+    isSelected,
+  };
+}
